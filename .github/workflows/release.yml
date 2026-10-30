@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - '.github/release-plan.json'
-      - '.github/workflows/release.yml'
   workflow_dispatch:
 
 permissions:
@@ -110,8 +109,9 @@ jobs:
           import fs from 'node:fs';
           import crypto from 'node:crypto';
           const r=JSON.parse(fs.readFileSync('.github/release-plan.json'));
-          const names=[`ChatGPT Modder-${r.version}-mac-arm64.dmg`,`ChatGPT Modder-${r.version}-win-x64.exe`];
-          if(JSON.stringify(fs.readdirSync('release-assets').sort())!==JSON.stringify([...names].sort()))throw Error('Missing or unexpected platform assets');
+          const originals=[`ChatGPT Modder-${r.version}-mac-arm64.dmg`,`ChatGPT Modder-${r.version}-win-x64.exe`];
+          if(JSON.stringify(fs.readdirSync('release-assets').sort())!==JSON.stringify([...originals].sort()))throw Error('Missing or unexpected platform assets');
+          const names=originals.map(name=>{const normalized=name.replaceAll(' ','.');fs.renameSync(`release-assets/${name}`,`release-assets/${normalized}`);return normalized;});
           const hashes=Object.fromEntries(names.map(n=>[n,crypto.createHash('sha256').update(fs.readFileSync(`release-assets/${n}`)).digest('hex')]));
           fs.writeFileSync('release-assets/BUILD-INFO.json',JSON.stringify({version:r.version,tag:r.tag,commit:process.env.GITHUB_SHA,workflowRun:process.env.GITHUB_RUN_ID,prerelease:true,assets:hashes,macos:'arm64 DMG using preset background and layout',windows:'x64 portable; ordinary restart issue WIN-003 remains open'},null,2)+'\n');
           names.push('BUILD-INFO.json');
