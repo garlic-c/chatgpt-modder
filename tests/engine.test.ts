@@ -9,6 +9,8 @@ import {
   mkdir,
   symlink,
   readlink,
+  lchmod,
+  lstat,
 } from "node:fs/promises";
 import { join, normalize } from "node:path";
 import { Asar, sha256 } from "../src/engine/asar";
@@ -255,3 +257,26 @@ test("引擎按适配器选择新版额度模块，拒绝缺少绑定证据的�
     /锚点/,
   );
 });
+
+test(
+  "macOS 备份与恢复保留不同于 umask 的框架符号链接权限",
+  { skip: process.platform !== "darwin" },
+  async (t) => {
+    const f = await fixture();
+    t.after(() => rm(f.temp, { recursive: true, force: true }));
+    const link = join(f.root, "Contents/FrameworkLink");
+    await symlink("Resources", link);
+    await lchmod(link, 0o755);
+    const original = await treeHash(f.root);
+    const previous = process.umask(0o077);
+    try {
+      await f.engine.apply(f.root, ["quota"]);
+      assert.equal((await lstat(link)).mode & 0o777, 0o755);
+      assert.equal(await readlink(link), "Resources");
+      await f.engine.restore(f.root);
+      assert.equal(await treeHash(f.root), original);
+    } finally {
+      process.umask(previous);
+    }
+  },
+);

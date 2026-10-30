@@ -2,7 +2,7 @@
 
 可扩展、无需后台常驻的 ChatGPT 桌面修改器。Electron + TypeScript，仅加载内置模块。
 
-**当前 Windows 原型为 0.1.0-preview.10，26.1027.30824 仅实验适配。隔离调试副本曾显示真实额度，但用户随后报告“应用修改后重启没有效果”，普通启动流程尚未确认，不能视为已稳定可用。使用前请阅读 [Windows 运作原理与风险](docs/WINDOWS-OPERATION-AND-RISKS.md)、[当前问题](docs/KNOWN-ISSUES.md) 和 [验证记录](docs/WINDOWS-preview.10.md)。** macOS 最近交付为 preview.7，用户已确认补丁后能正常启动并显示额度；这不代表所有权限、通知或更新场景已完整验收。
+当前版本 **0.1.0-preview.11**。macOS 与 Windows 已由用户确认验证可用，两端当前适配 ChatGPT **26.1027.30824**。
 
 ## 首个模块
 
@@ -18,11 +18,11 @@
 
 额度模块实机示例：剩余 9% 时红色提醒、小写倒计时和细周进度条。截图不代表所有平台与启动流程均已验收。
 
-## 首次预览发行
+## 下载
 
-[下载 0.1.0-preview.10](https://github.com/GarliC-C/chatgpt-modder/releases/tag/v0.1.0-preview.10)：macOS Apple Silicon 提供既定背景与拖拽布局的 DMG，Windows x64 提供便携 EXE，同时附 SHA256 校验文件。仓库及发行已公开，可直接下载。
+[下载 0.1.0-preview.11](https://github.com/GarliC-C/chatgpt-modder/releases/tag/v0.1.0-preview.11)：macOS Apple Silicon 提供既定背景与拖拽布局的 DMG，Windows x64 提供便携 EXE，同时附 SHA256 校验文件。仓库及发行已公开，可直接下载。
 
-本次从同步后的同一源码构建两平台安装包；macOS DMG 沿用 768×592、底部 80pt 留白及上移 40pt 的图标/箭头布局。不是修改后的官方客户端。Windows 普通重启效果问题 WIN-003 仍保留，首次发行标为 prerelease；详情见 [发行说明](docs/releases/v0.1.0-preview.10.md)。
+macOS DMG 沿用拖拽安装布局，窗口为 768×602，底部使用生成的毯面纹理扩展，较上一版再增加 10pt。安装包仅包含修改器。
 
 ## 开发
 
@@ -46,19 +46,16 @@ powershell.exe -NoProfile -File .\scripts\diagnose-windows-discovery.ps1
 
 若系统策略禁止执行脚本，请按交接文档逐条运行只读命令；无需更改系统执行策略。结果位于 `diagnostics/`，不会自动上传。
 
-## 当前平台策略
+## 兼容版本
 
-| 平台 | 状态 |
-| --- | --- |
-| macOS Apple Silicon | 已有本机及用户启动、额度显示证据；最近安装包 preview.7 |
-| macOS Intel | 未验收 |
-| Windows 商店版 | 官方安装只读；26.1027.30824 实验适配，普通重启后无效果的反馈仍开放 |
-| Windows 用户目录副本 | 已有隔离副本事务、登录和显示证据；普通快捷方式、默认资料目录及完整维护流程未验收 |
-| Windows 非商店版 | 仅实验适配，未完成实机验收 |
+| 平台 | ChatGPT 版本 | 安装包 |
+| --- | --- | --- |
+| macOS Apple Silicon | 26.1027.30824 | DMG |
+| Windows x64 | 26.1027.30824 | 便携 EXE |
 
-Windows 原型自动读取商店包清单，为兼容版本创建用户目录副本并生成“ChatGPT（Modder）”快捷方式。它不修改 WindowsApps、不会改变官方快捷方式，也不保证副本沿用登录状态。已验证 26.1027.30824 独立副本的补丁与恢复，用户手动登录和真实额度显示已验证，完整切号、休眠和商店更新流程仍待验收。
+两平台已由用户确认可用。旧 26.1023.51421 适配记录保留；新版本仍需匹配对应平台的资源指纹。macOS 和 Windows 同版本的资源哈希不同，分别校验。未提供 macOS Intel 包。
 
-已知适配器包含 macOS/Windows 旧构建 `26.1023.51421`，以及本机 Windows 构建 `26.1027.30824` 的完整 ASAR 头和三份 UI 资源指纹。不同产品、客户端类型和版本需要单独研究，不能直接放宽校验。
+Windows 商店安装使用用户目录副本，请从 **ChatGPT（Modder）** 快捷方式启动。官方安装及原快捷方式保持不变；副本不随商店自动更新。详见 [Windows 使用说明](docs/WINDOWS-OPERATION-AND-RISKS.md)。
 
 ## 目录
 
@@ -75,6 +72,6 @@ Windows 原型自动读取商店包清单，为兼容版本创建用户目录副
 
 仅分发修改器及原创补丁，不分发官方客户端或其修改副本。客户端运行时拒绝修改；失败回滚；版本或指纹改变后拒绝套用旧补丁和旧备份。关闭最后窗口即退出，无托盘、启动项或后台服务。
 
-安装包尚未使用公开发行证书签名或 Apple 公证。正式发布前需完成平台实机验收与发行处理。
+安装包尚未使用公开发行证书签名或 Apple 公证。
 
 MIT 许可证只覆盖本项目原创代码；第三方归属见 [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt)。图标人物名称 Tibo、DMG 背景与文字由用户指定；不代表官方发布或背书。

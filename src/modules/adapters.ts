@@ -40,7 +40,7 @@ adapters.push({
   version: "26.1027.30824",
   headerHash:
     "58b11f647e1119b429ae364292977cf86fe116de3987265ccd2a265991fb9d85",
-  status: "experimental",
+  status: "verified",
   files: {
     "webview/assets/app-primary-998934e837fc.js":
       "084d7102a8eca9a49fc37e25d7b95c2c8052d3b5b2709e28867e266748d761a0",
@@ -68,5 +68,36 @@ adapters.push({
       "function MG(){",
       "um(),jG=",
     ],
+  },
+});
+
+// macOS uses the same client version as Windows, but platform-specific assets.
+// Every alias below was checked in the fingerprinted macOS resource, not inferred
+// from matching version strings alone.
+const windowsCurrent = adapters.find((a) => a.id === "win-26.1027.30824-x64")!;
+adapters.push({
+  ...windowsCurrent,
+  id: "mac-26.1027.30824-arm64",
+  platform: "darwin",
+  status: "verified",
+  headerHash:
+    "a452d061300e76daf2f9e32a08b74b7d6ea6a54a3c4e4665cf1ee5f1f1ef5ce2",
+  files: {
+    "webview/assets/app-primary-95a0e6d83f1e.js":
+      "e6b2abb4c858523506c5205b7628b106f82c2e043b085fa35be829b8999829f7",
+    "webview/assets/app-initial-60f141238751.js":
+      "72b67fc719cccb37a1da02fd06f71d840ec2805b813c1fac3a4fc5cca59cc16c",
+    "webview/assets/app-shared-7815d5a1a42a.js":
+      "78f88eb7bb88cc8271103ee6e27e7c51c5d44a185b8b4923386f7d207659c0c4",
+  },
+  nativeFiles: {
+    "Contents/MacOS/ChatGPT":
+      "df23c13298327375ad613bb43d69dab6706591898a026e223316763b0ad7b069",
+    "Contents/Frameworks/Codex Framework.framework/Codex Framework":
+      "3e97c7605a57927741f918bdb55c1f63c9b37d3549133386e472ca38e097a76a",
+  },
+  quota: {
+    ...windowsCurrent.quota!,
+    target: "webview/assets/app-primary-95a0e6d83f1e.js",
   },
 });

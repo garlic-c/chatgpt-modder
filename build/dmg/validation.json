@@ -1,15 +1,23 @@
 {
-  "version": "0.1.0-preview.7",
-  "architecture": "arm64",
-  "dmgChecksum": "VALID",
+  "version": "0.1.0-preview.11",
   "windowSize": [
     768,
-    592
+    602
   ],
-  "iconSize": 160,
-  "textSize": 16,
-  "positions": {
-    "ChatGPT Modder.app": [
+  "backgroundPixels": [
+    [
+      768,
+      602
+    ],
+    [
+      1536,
+      1204
+    ]
+  ],
+  "bottomExtension": 90,
+  "addedSincePrevious": 10,
+  "iconPositions": {
+    "app": [
       235,
       180
     ],
@@ -18,27 +26,5 @@
       180
     ]
   },
-  "applicationsTarget": "/Applications",
-  "backgroundPixels": [
-    [
-      768,
-      592
-    ],
-    [
-      1536,
-      1184
-    ]
-  ],
-  "backgroundLogicalSize": [
-    768,
-    592
-  ],
-  "copyVerification": {
-    "files": 259,
-    "allHashesMatch": true
-  },
-  "finderScreenshotVerified": false,
-  "reason": "Computer-use host unavailable",
-  "bottomPadding": 80,
-  "iconsAndArrowMovedUp": 40
+  "background": "imagegen outpaint of original blanket folds; original portrait and text preserved"
 }

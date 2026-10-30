@@ -1,11 +1,9 @@
-# DMG 包装
+# DMG 背景与布局
 
-background-source.png 为用户提供的原背景，保持不变。build-dmg-background.swift 在其上绘制拖拽箭头并导出 1x/2x 安装界面背景；electron-builder 将两档图像合并为 Retina TIFF。
+- 原图：background-source.png，人物与文字保持原位置和大小。
+- 纹理扩图：background-extended.png，由 imagegen 向下延展原有蓝色毯面折纹生成。
+- 构建脚本将原图主体叠回，并仅在文字下方的空白尾部与生成纹理柔和衔接，避免改变原有排版。
+- 画布：768×602pt / Retina 1536×1204px；原图高度 512pt，底部纹理延展共 90pt，较上一版再增加 10pt。
+- 图标中心 (235,180)、(535,180)，箭头位置不再改变；Finder 使用真实应用与 Applications 快捷方式。
 
-Finder 采用真实应用图标和真实 /Applications 快捷方式，不将图标及标签烘焙到背景中。原生标题栏随系统外观变化。窗口 768×592，图标 160pt，标签 16pt；坐标与背景一致，留出左下文字区域。
-
-执行 npm run pack:dmg 重建。仅封装 Modder，不附带或修改 ChatGPT 客户端。
-
-validation.json 记录本机实际挂载和文件检查结果；未声称完成 Finder 窗口截图验收。
-
-修订：原 512pt 背景内容保持尺寸与顶部位置，底部增加 80pt 空白渐变；两个图标及箭头上移 40pt。窗口高度改为 592pt，为开启状态栏和路径栏的 Finder 留出余量。
+执行 npm run pack:dmg 重建。背景不再通过纯色或线性渐变填充底部。

@@ -1,8 +1,15 @@
 {
   "compilerOptions": {
-    "target": "ES2023", "module": "NodeNext", "moduleResolution": "NodeNext",
-    "strict": true, "esModuleInterop": true, "skipLibCheck": true,
-    "lib": ["ES2023", "DOM"], "types": ["node"], "ignoreDeprecations": "6.0"
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "ignoreDeprecations": "6.0",
+    "resolveJsonModule": true
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"]
 }

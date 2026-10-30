@@ -1,4 +1,4 @@
-name: First preview release
+name: Build and publish release
 
 on:
   push:
@@ -113,7 +113,7 @@ jobs:
           if(JSON.stringify(fs.readdirSync('release-assets').sort())!==JSON.stringify([...originals].sort()))throw Error('Missing or unexpected platform assets');
           const names=originals.map(name=>{const normalized=name.replaceAll(' ','.');fs.renameSync(`release-assets/${name}`,`release-assets/${normalized}`);return normalized;});
           const hashes=Object.fromEntries(names.map(n=>[n,crypto.createHash('sha256').update(fs.readFileSync(`release-assets/${n}`)).digest('hex')]));
-          fs.writeFileSync('release-assets/BUILD-INFO.json',JSON.stringify({version:r.version,tag:r.tag,commit:process.env.GITHUB_SHA,workflowRun:process.env.GITHUB_RUN_ID,prerelease:true,assets:hashes,macos:'arm64 DMG using preset background and layout',windows:'x64 portable; ordinary restart issue WIN-003 remains open'},null,2)+'\n');
+          fs.writeFileSync('release-assets/BUILD-INFO.json',JSON.stringify({version:r.version,tag:r.tag,commit:process.env.GITHUB_SHA,workflowRun:process.env.GITHUB_RUN_ID,prerelease:true,assets:hashes,macos:'arm64 DMG using preset background and layout',windows:'x64 portable; user-confirmed functional'},null,2)+'\n');
           names.push('BUILD-INFO.json');
           fs.writeFileSync('release-assets/SHA256SUMS.txt',names.sort().map(n=>crypto.createHash('sha256').update(fs.readFileSync(`release-assets/${n}`)).digest('hex')+'  '+n+'\n').join(''));
           JS
