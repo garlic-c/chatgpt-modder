@@ -20,7 +20,7 @@
 
 ## 首次预览发行
 
-[下载 0.1.0-preview.10](https://github.com/GarliC-C/chatgpt-modder/releases/tag/v0.1.0-preview.10)：macOS Apple Silicon 提供既定背景与拖拽布局的 DMG，Windows x64 提供便携 EXE，同时附 SHA256 校验文件。仓库及发行保持私密，下载需使用有访问权的 GitHub 账号。
+[下载 0.1.0-preview.10](https://github.com/GarliC-C/chatgpt-modder/releases/tag/v0.1.0-preview.10)：macOS Apple Silicon 提供既定背景与拖拽布局的 DMG，Windows x64 提供便携 EXE，同时附 SHA256 校验文件。仓库及发行已公开，可直接下载。
 
 本次从同步后的同一源码构建两平台安装包；macOS DMG 沿用 768×592、底部 80pt 留白及上移 40pt 的图标/箭头布局。不是修改后的官方客户端。Windows 普通重启效果问题 WIN-003 仍保留，首次发行标为 prerelease；详情见 [发行说明](docs/releases/v0.1.0-preview.10.md)。
 

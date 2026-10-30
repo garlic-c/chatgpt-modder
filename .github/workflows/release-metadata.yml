@@ -1,3 +1,4 @@
+# Keep published release notes aligned with the user-approved public repository status.
 name: Verify and normalize first release metadata
 on:
   push:
