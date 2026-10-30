@@ -1,0 +1,146 @@
+name: First preview release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/release-plan.json'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - id: plan
+        name: Validate release plan
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const p=JSON.parse(fs.readFileSync('package.json'));
+          const r=JSON.parse(fs.readFileSync('.github/release-plan.json'));
+          if(r.version!==p.version||r.tag!==`v${p.version}`||r.prerelease!==true)throw Error('Invalid preview release plan');
+          if(!fs.existsSync(r.notes))throw Error('Missing release notes');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,`version=${p.version}\n`);
+          JS
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  macos:
+    needs: validate
+    runs-on: macos-15
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build preset Apple Silicon DMG
+        run: npm run pack:dmg
+      - name: Verify DMG
+        run: hdiutil verify "release/ChatGPT Modder-${{ needs.validate.outputs.version }}-mac-arm64.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-macos
+          path: release/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+  windows:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run pack:win
+      - name: Verify executable icons
+        run: node scripts/verify-windows-icon.mjs "release/win-unpacked/ChatGPT Modder.exe" "release/ChatGPT Modder-${{ needs.validate.outputs.version }}-win-x64.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-windows
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [validate, macos, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          path: release-assets
+          merge-multiple: true
+      - name: Generate checksums and build record
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const r=JSON.parse(fs.readFileSync('.github/release-plan.json'));
+          const names=[`ChatGPT Modder-${r.version}-mac-arm64.dmg`,`ChatGPT Modder-${r.version}-win-x64.exe`];
+          if(JSON.stringify(fs.readdirSync('release-assets').sort())!==JSON.stringify([...names].sort()))throw Error('Missing or unexpected platform assets');
+          const hashes=Object.fromEntries(names.map(n=>[n,crypto.createHash('sha256').update(fs.readFileSync(`release-assets/${n}`)).digest('hex')]));
+          fs.writeFileSync('release-assets/BUILD-INFO.json',JSON.stringify({version:r.version,tag:r.tag,commit:process.env.GITHUB_SHA,workflowRun:process.env.GITHUB_RUN_ID,prerelease:true,assets:hashes,macos:'arm64 DMG using preset background and layout',windows:'x64 portable; ordinary restart issue WIN-003 remains open'},null,2)+'\n');
+          names.push('BUILD-INFO.json');
+          fs.writeFileSync('release-assets/SHA256SUMS.txt',names.sort().map(n=>crypto.createHash('sha256').update(fs.readFileSync(`release-assets/${n}`)).digest('hex')+'  '+n+'\n').join(''));
+          JS
+      - name: Publish complete preview release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs=require('node:fs');
+            const path=require('node:path');
+            const plan=JSON.parse(fs.readFileSync('.github/release-plan.json','utf8'));
+            const {owner,repo}=context.repo;
+            let release;
+            try {
+              release=(await github.rest.repos.getReleaseByTag({owner,repo,tag:plan.tag})).data;
+              if(!release.draft||release.target_commitish!==context.sha)throw Error('Refusing to overwrite an existing published or unrelated release');
+            } catch(error) {
+              if(error.status!==404)throw error;
+              release=(await github.rest.repos.createRelease({owner,repo,tag_name:plan.tag,target_commitish:context.sha,name:plan.name,body:fs.readFileSync(plan.notes,'utf8').replace(/\]\((\.\.?\/[^)]+)\)/g,(_,target)=>'](https://github.com/'+owner+'/'+repo+'/blob/'+context.sha+'/'+path.posix.normalize(path.posix.join(path.posix.dirname(plan.notes),target))+')'),draft:true,prerelease:true})).data;
+            }
+            const old=(await github.rest.repos.listReleaseAssets({owner,repo,release_id:release.id,per_page:100})).data;
+            for(const asset of old)await github.rest.repos.deleteReleaseAsset({owner,repo,asset_id:asset.id});
+            const files=fs.readdirSync('release-assets').sort();
+            if(files.length!==4)throw Error('Incomplete release asset set');
+            for(const name of files){
+              const data=fs.readFileSync(path.join('release-assets',name));
+              const uploaded=(await github.rest.repos.uploadReleaseAsset({owner,repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}})).data;
+              if(uploaded.size!==data.length)throw Error('Asset size mismatch: '+name);
+            }
+            await github.rest.repos.updateRelease({owner,repo,release_id:release.id,draft:false,prerelease:true,make_latest:'false'});
+            core.notice('Published '+release.html_url);

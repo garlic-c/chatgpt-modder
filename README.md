@@ -8,6 +8,22 @@
 
 头像上方显示 5H 剩余百分比、重置倒计时及周剩余细进度条。百分比不超过 10% 时变红，单位为小写，进度条为 1px。复用客户端账号额度状态；未知或失效数据使用占位，切换账号清除旧数据。组件自带异步与异常边界，不应阻塞整页初始化。
 
+## 截图
+
+![ChatGPT Modder 的 macOS 深色界面](docs/images/modder-macos.png)
+
+修改器界面示例，由用户提供，截图版本为 macOS preview.7；当前发行版本见下方下载页。
+
+![ChatGPT 头像上方的额度显示，剩余 9% 时显示红色](docs/images/quota-low.png)
+
+额度模块实机示例：剩余 9% 时红色提醒、小写倒计时和细周进度条。截图不代表所有平台与启动流程均已验收。
+
+## 首次预览发行
+
+[下载 0.1.0-preview.10](https://github.com/GarliC-C/chatgpt-modder/releases/tag/v0.1.0-preview.10)：macOS Apple Silicon 提供既定背景与拖拽布局的 DMG，Windows x64 提供便携 EXE，同时附 SHA256 校验文件。仓库及发行保持私密，下载需使用有访问权的 GitHub 账号。
+
+本次从同步后的同一源码构建两平台安装包；macOS DMG 沿用 768×592、底部 80pt 留白及上移 40pt 的图标/箭头布局。不是修改后的官方客户端。Windows 普通重启效果问题 WIN-003 仍保留，首次发行标为 prerelease；详情见 [发行说明](docs/releases/v0.1.0-preview.10.md)。
+
 ## 开发
 
 使用 Node.js 24、npm、Git。在干净克隆目录执行：
