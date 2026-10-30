@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'"
+    />
+    <title>ChatGPT Modder</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="window-chrome" aria-hidden="true"></div>
+    <main>
+      <header>
+        <h1>ChatGPT Modder</h1>
+        <button id="choose" class="client-button" title="选择 ChatGPT 客户端">
+          <img id="client-icon" alt="" hidden /><span id="client-label"
+            >检测中…</span
+          >
+        </button>
+      </header>
+      <div id="status" role="status" hidden></div>
+      <div id="modules">
+        <section class="feature" aria-labelledby="quota-title">
+          <div class="feature-heading">
+            <h2 id="quota-title">在用户头像上方查看用量</h2>
+            <label class="switch-row"
+              ><input
+                id="quota"
+                type="checkbox"
+                aria-labelledby="quota-title"
+                role="switch" /><span class="switch" aria-hidden="true"></span
+            ></label>
+          </div>
+          <div class="preview" aria-label="侧栏用量效果示意">
+            <div class="mock-window">
+              <div class="mock-rail">
+                <div class="mock-quota">
+                  <span class="mock-percent">42%</span>
+                  <div class="mock-time">
+                    <span>3h46m</span>
+                    <div class="progress"><i></i></div>
+                  </div>
+                </div>
+                <div class="mock-avatar">你</div>
+              </div>
+              <div class="mock-conversations" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+      <div class="notes">
+        <p class="signature-note">
+          本地签名会改变原开发者授权；修改前自动备份，恢复时校验原版。
+        </p>
+      </div>
+      <div id="log" class="log" role="log" aria-live="polite"></div>
+      <footer>
+        <div class="footer-links">
+          <span id="version" class="version"></span
+          ><button id="diagnose" class="text" disabled>导出兼容诊断</button
+          ><button id="restore" class="text" disabled>恢复原版</button
+          ><button id="recover" class="text" disabled>恢复中断操作</button>
+        </div>
+        <button id="apply" class="primary" disabled>应用修改</button>
+      </footer>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,89 @@
+{
+  "name": "chatgpt-modder",
+  "version": "0.1.0-preview.8",
+  "private": true,
+  "description": "可扩展、无需后台常驻的 ChatGPT 桌面修改器（预览版）",
+  "author": "ChatGPT Modder contributors",
+  "license": "MIT",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/run-tests.mjs",
+    "start": "npm run build && electron .",
+    "inspect": "node --import tsx src/cli.ts inspect",
+    "pack:mac": "npm run build && electron-builder --mac dmg zip --arm64 --publish never",
+    "pack:win": "node scripts/build-windows-icon.mjs && npm run build && electron-builder --win portable --x64 --publish never",
+    "format": "prettier --write src tests scripts",
+    "pack:dmg": "swift scripts/build-dmg-background.swift build/dmg/background-source.png build/dmg && npm run build && electron-builder --mac dmg --arm64 --publish never"
+  },
+  "devDependencies": {
+    "@electron/asar": "^4.3.1",
+    "@types/node": "^24.0.0",
+    "electron": "45.1.0",
+    "electron-builder": "26.18.0",
+    "esbuild": "0.28.2",
+    "jsdom": "30.1.3",
+    "prettier": "^3.9.10",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tsx": "^4.20.0",
+    "typescript": "7.0.2"
+  },
+  "build": {
+    "appId": "local.chatgpt.modder",
+    "productName": "ChatGPT Modder",
+    "files": [
+      "dist/**",
+      "package.json",
+      "LICENSE",
+      "THIRD-PARTY-NOTICES.txt"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "category": "public.app-category.utilities",
+      "identity": null,
+      "icon": "build/icons/Tibo.icns"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "signAndEditExecutable": false,
+      "icon": "build/icons/Tibo.ico"
+    },
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "afterPack": "scripts/after-pack.cjs",
+    "dmg": {
+      "title": "ChatGPT Modder",
+      "background": "build/dmg/background.png",
+      "icon": "build/icons/Tibo.icns",
+      "iconSize": 160,
+      "iconTextSize": 16,
+      "format": "UDZO",
+      "filesystem": "HFS+",
+      "contents": [
+        {
+          "x": 235,
+          "y": 180,
+          "type": "file"
+        },
+        {
+          "x": 535,
+          "y": 180,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "writeUpdateInfo": false
+    }
+  },
+  "dependencies": {
+    "resedit": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}
