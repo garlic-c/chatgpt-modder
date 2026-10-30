@@ -2,7 +2,7 @@
 
 可扩展、无需后台常驻的 ChatGPT 桌面修改器。Electron + TypeScript，仅加载内置模块。
 
-**当前 Windows 原型为 `0.1.0-preview.8`，启动时仍无法在用户 Windows PC 上自动定位商店版客户端。Windows 支持尚未验收，请先阅读 [Windows 开发交接](docs/HANDOFF-WINDOWS.md) 和 [已知问题](docs/KNOWN-ISSUES.md)。** macOS 最近交付为 preview.7，用户已确认补丁后能正常启动并显示额度；这不代表所有权限、通知或更新场景已完整验收。
+**当前 Windows 原型为 0.1.0-preview.10，26.1027.30824 仅实验适配。隔离调试副本曾显示真实额度，但用户随后报告“应用修改后重启没有效果”，普通启动流程尚未确认，不能视为已稳定可用。使用前请阅读 [Windows 运作原理与风险](docs/WINDOWS-OPERATION-AND-RISKS.md)、[当前问题](docs/KNOWN-ISSUES.md) 和 [验证记录](docs/WINDOWS-preview.10.md)。** macOS 最近交付为 preview.7，用户已确认补丁后能正常启动并显示额度；这不代表所有权限、通知或更新场景已完整验收。
 
 ## 首个模块
 
@@ -36,13 +36,13 @@ powershell.exe -NoProfile -File .\scripts\diagnose-windows-discovery.ps1
 | --- | --- |
 | macOS Apple Silicon | 已有本机及用户启动、额度显示证据；最近安装包 preview.7 |
 | macOS Intel | 未验收 |
-| Windows 商店版 | preview.8 自动定位仍失败；包类型、路径、权限及识别失败原因未知 |
-| Windows 用户目录副本 | 代码原型已实现，尚未进入用户实机验收；可能受包身份及登录回调影响 |
+| Windows 商店版 | 官方安装只读；26.1027.30824 实验适配，普通重启后无效果的反馈仍开放 |
+| Windows 用户目录副本 | 已有隔离副本事务、登录和显示证据；普通快捷方式、默认资料目录及完整维护流程未验收 |
 | Windows 非商店版 | 仅实验适配，未完成实机验收 |
 
-Windows 原型拟自动读取商店包清单，再为兼容版本创建用户目录副本并生成“ChatGPT（Modder）”快捷方式。它不修改 WindowsApps、不会改变官方快捷方式，也不保证副本沿用登录状态。当前发现阶段即失败，不能将该流程当作已可用功能。
+Windows 原型自动读取商店包清单，为兼容版本创建用户目录副本并生成“ChatGPT（Modder）”快捷方式。它不修改 WindowsApps、不会改变官方快捷方式，也不保证副本沿用登录状态。已验证 26.1027.30824 独立副本的补丁与恢复，用户手动登录和真实额度显示已验证，完整切号、休眠和商店更新流程仍待验收。
 
-已知适配器目前仅记录客户端 `26.1023.51421`；Windows 记录沿用相同构建的共享 UI 指纹，未取得用户 Windows 客户端实物证据。不同产品、客户端类型和版本需要单独研究，不能直接放宽校验。
+已知适配器包含 macOS/Windows 旧构建 `26.1023.51421`，以及本机 Windows 构建 `26.1027.30824` 的完整 ASAR 头和三份 UI 资源指纹。不同产品、客户端类型和版本需要单独研究，不能直接放宽校验。
 
 ## 目录
 
@@ -53,7 +53,7 @@ Windows 原型拟自动读取商店包清单，再为兼容版本创建用户目
 - `build/`：原创图标、Icon Composer 源文件和 DMG 背景。
 - `docs/`：当前交接、架构、验证及故障记录；`docs/history/` 为历史记录。
 
-[架构与扩展](docs/ARCHITECTURE.md) · [验证状态](docs/VALIDATION.md) · [Windows 验证清单](docs/WINDOWS-TEST.md)
+[Windows 运作原理与风险](docs/WINDOWS-OPERATION-AND-RISKS.md) · [架构与扩展](docs/ARCHITECTURE.md) · [验证状态](docs/VALIDATION.md) · [Windows 验证清单](docs/WINDOWS-TEST.md)
 
 ## 发布与恢复
 

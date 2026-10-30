@@ -12,7 +12,7 @@ interface API {
     { id: string; name: string; description: string; version: string }[]
   >;
   inspect(path: string): Promise<ClientState>;
-  diagnose(path: string): Promise<boolean>;
+  diagnose(path?: string): Promise<boolean>;
   apply(path: string, ids: string[]): Promise<ClientState>;
   restore(path: string): Promise<ClientState>;
   recover(path: string): Promise<ClientState>;
@@ -62,7 +62,7 @@ function sync() {
     !state.modules.length ||
     state.pending;
   el<HTMLButtonElement>("recover").disabled = busy || detecting || !path;
-  el<HTMLButtonElement>("diagnose").disabled = busy || detecting || !path;
+  el<HTMLButtonElement>("diagnose").disabled = busy || detecting;
   document.querySelector<HTMLElement>(".mock-quota")!.style.opacity =
     checkbox.checked ? "1" : "0";
 }
@@ -197,7 +197,7 @@ void window.modder
   })
   .catch((e) => {
     clientButton(false);
-    status("自动检测失败，请选择客户端。", true);
+    status(`自动检测失败：${(e as Error).message}；可导出诊断。`, true);
   })
   .finally(() => {
     detecting = false;

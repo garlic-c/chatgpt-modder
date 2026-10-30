@@ -12,7 +12,12 @@ import { pathToFileURL } from "node:url";
 import { writeFile, readFile } from "node:fs/promises";
 import { Engine } from "./engine/engine";
 import { builtInModules } from "./modules/quota";
-import { clientCandidates, discoverClient } from "./engine/discovery";
+import {
+  clientCandidates,
+  discoverClient,
+  discoveryError,
+  type DiscoveryReport,
+} from "./engine/discovery";
 import { icnsPng } from "./engine/icons";
 import { windowsExecutable, assertStopped } from "./engine/platform";
 import { WindowsCopy } from "./engine/windows-copy";
@@ -53,6 +58,7 @@ else {
     const log = (message: string) =>
       win?.webContents.send("operation-log", message);
     const preferenceFile = join(app.getPath("userData"), "client.json");
+    let discovery: DiscoveryReport = { candidates: [] };
     const inspectClient = async (path: string) => {
       let state = await engine.inspect(path);
       if (
@@ -121,14 +127,20 @@ else {
       } catch {}
       const managed =
         process.platform === "win32" && preferred?.startsWith(copies.storage);
+      discovery = { candidates: [] };
       const candidates = await clientCandidates(
         process.platform,
         managed ? undefined : preferred,
+        process.env,
+        app.getPath("home"),
+        discovery,
       );
-      const found = await discoverClient(candidates, inspectClient);
+      const found = await discoverClient(candidates, inspectClient, discovery);
       if (found) return found;
-      return managed && preferred
-        ? discoverClient([preferred], inspectClient)
+      if (discovery.query?.error)
+        log(`安装包查询失败：${discovery.query.error}`);
+      return managed && preferred && !discovery.query?.error
+        ? discoverClient([preferred], inspectClient, discovery)
         : null;
     });
     ipcMain.handle("version", (event) => {
@@ -172,11 +184,26 @@ else {
     });
     ipcMain.handle("diagnose", async (event, path) => {
       trusted(event);
-      pathArg(path);
+      if (path !== undefined && path !== "") pathArg(path);
       if (busy) throw Error("操作尚未完成");
+      let client: unknown;
+      let clientError: string | undefined;
+      if (path) {
+        try {
+          client = await engine.diagnose(path);
+        } catch (error) {
+          clientError = discoveryError(error);
+        }
+      }
       const data = {
-        ...(await engine.diagnose(path)),
+        schema: 2,
+        platform: process.platform,
+        collectedAt: new Date().toISOString(),
+        discovery,
+        client,
+        clientError,
         modderVersion: app.getVersion(),
+        note: "仅含安装路径、发现错误、版本和资源指纹，不含账号或聊天内容",
       };
       const result = await dialog.showSaveDialog(win!, {
         title: "导出兼容诊断",

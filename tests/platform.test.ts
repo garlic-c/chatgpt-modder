@@ -60,6 +60,43 @@ test("Windows 缺失或未知的完整性资源不能写入", () => {
     rewritePeHeaderHash(Buffer.from(exe.generate()), "a".repeat(64)),
   );
 });
+
+test("Windows 实机格式：大写 SHA256、双反斜杠路径可读写且保留原格式", () => {
+  const fixture = (values: unknown) => {
+    const exe = NtExecutable.createEmpty(false, false);
+    const resources = NtExecutableResource.from(exe);
+    resources.replaceResourceEntryFromString(
+      "INTEGRITY",
+      "ELECTRONASAR",
+      1033,
+      JSON.stringify(values),
+    );
+    resources.outputResource(exe);
+    return Buffer.from(exe.generate());
+  };
+  const item = {
+    file: "resources\\\\app.asar",
+    alg: "SHA256",
+    value: "a".repeat(64),
+  };
+  const binary = fixture([item]);
+  assert.equal(peHeaderHash(binary), item.value);
+  const changed = rewritePeHeaderHash(binary, "b".repeat(64));
+  assert.equal(peHeaderHash(changed), "b".repeat(64));
+  const resources = NtExecutableResource.from(NtExecutable.from(changed));
+  const values = JSON.parse(
+    resources.getResourceEntriesAsString("INTEGRITY", "ELECTRONASAR")[0][1],
+  );
+  assert.deepEqual(values, [{ ...item, value: "b".repeat(64) }]);
+  for (const invalid of [
+    [{ ...item, alg: "SHA1" }],
+    [{ ...item, file: "../resources/app.asar" }],
+    [item, item],
+    [null],
+    {},
+  ])
+    assert.throws(() => rewritePeHeaderHash(fixture(invalid), "b".repeat(64)));
+});
 test("Mac 本地签名剔除团队专属授权，保留必要 JIT 授权", () => {
   const result = localEntitlements({
     "com.apple.application-identifier": "team.app",

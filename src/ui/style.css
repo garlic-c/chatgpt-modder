@@ -432,3 +432,49 @@ textarea,
   -webkit-user-select: text;
   user-select: text;
 }
+
+/* Keep diagnostics reachable in the supported compact window, including errors. */
+@media (max-height: 480px) {
+  body {
+    height: 100vh;
+  }
+  main {
+    min-height: 0;
+    padding-top: 6px;
+    padding-bottom: 10px;
+  }
+  header {
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+  #status {
+    padding: 6px 10px;
+    margin-bottom: 10px;
+    max-height: 52px;
+    overflow: auto;
+    flex-shrink: 0;
+  }
+  #modules {
+    flex-shrink: 0;
+  }
+  .preview {
+    height: 112px;
+  }
+  .feature-heading {
+    padding: 16px;
+    gap: 12px;
+  }
+  .notes {
+    padding: 6px 0;
+  }
+  .log {
+    min-height: 0;
+    max-height: 54px;
+    margin-bottom: 4px;
+  }
+  footer {
+    flex-shrink: 0;
+    padding-top: 10px;
+    gap: 10px;
+  }
+}

@@ -1,6 +1,9 @@
 import { NtExecutable, NtExecutableResource } from "resedit";
 const same = (a: string | number, b: string) =>
   String(a).toLowerCase() === b.toLowerCase();
+const isAsar = (file: unknown) =>
+  typeof file === "string" &&
+  file.replace(/\\+/g, "/").toLowerCase() === "resources/app.asar";
 export function peHeaderHash(binary: Buffer) {
   const exe = NtExecutable.from(binary, { ignoreCert: true }),
     resources = NtExecutableResource.from(exe);
@@ -11,11 +14,15 @@ export function peHeaderHash(binary: Buffer) {
   const entries = JSON.parse(
     Buffer.from(entry.bin).toString("utf8").replace(/\0+$/, ""),
   );
-  const item = entries.find(
-    (e: { file?: string }) =>
-      e.file?.replaceAll("\\", "/").toLowerCase() === "resources/app.asar",
-  );
-  if (!item || item.alg !== "sha256" || !/^[a-f0-9]{64}$/i.test(item.value))
+  if (!Array.isArray(entries)) throw Error("Windows 完整性资源格式不匹配");
+  const matches = entries.filter((e) => e && isAsar(e.file));
+  const item = matches[0];
+  if (
+    matches.length !== 1 ||
+    typeof item.alg !== "string" ||
+    item.alg.toLowerCase() !== "sha256" ||
+    !/^[a-f0-9]{64}$/i.test(item.value)
+  )
     throw Error("Windows 完整性资源格式不匹配");
   return item.value as string;
 }
@@ -30,11 +37,7 @@ export function rewritePeHeaderHash(binary: Buffer, hash: string) {
   const values = JSON.parse(
     Buffer.from(entry.bin).toString("utf8").replace(/\0+$/, ""),
   );
-  for (const value of values)
-    if (
-      value.file?.replaceAll("\\", "/").toLowerCase() === "resources/app.asar"
-    )
-      value.value = hash;
+  for (const value of values) if (isAsar(value?.file)) value.value = hash;
   resources.replaceResourceEntryFromString(
     entry.type,
     entry.id,

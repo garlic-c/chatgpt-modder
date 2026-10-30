@@ -3,7 +3,58 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { clientCandidates, discoverClient } from "../src/engine/discovery";
+import {
+  clientCandidates,
+  discoverClient,
+  storeLocations,
+  type DiscoveryReport,
+} from "../src/engine/discovery";
+
+test("清单候选检查失败仍显示已定位，保留诊断；普通残留目录不误报", async () => {
+  const root = await mkdtemp(join(tmpdir(), "cgm-discovery-report-"));
+  try {
+    const report: DiscoveryReport = {
+      candidates: [{ path: root, source: "store" }],
+    };
+    const inspect = async () => {
+      throw Error("Windows 完整性资源格式不匹配");
+      return { compatible: false };
+    };
+    const result = await discoverClient([root], inspect, report);
+    assert.equal(result?.path, root);
+    assert.equal(result?.inspection, null);
+    assert.match(result!.error!, /完整性资源格式不匹配/);
+    assert.equal(report.candidates[0].stage, "inspect");
+    assert.match(report.candidates[0].error!, /完整性资源/);
+    report.candidates[0].source = "common";
+    assert.equal(await discoverClient([root], inspect, report), null);
+    const valid = join(root, "valid");
+    await mkdir(valid);
+    report.candidates[0].source = "store";
+    assert.equal(
+      (
+        await discoverClient(
+          [root, valid],
+          async (p) => (p === root ? inspect() : { compatible: true }),
+          report,
+        )
+      )?.path,
+      valid,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("结构化商店发现结果保留路径兼容性", () => {
+  const path = "C:\\Program Files\\WindowsApps\\OpenAI.Codex\\app";
+  assert.deepEqual(
+    storeLocations(
+      JSON.stringify({ paths: [path], manifestErrors: ["manifest failed"] }),
+    ),
+    [path],
+  );
+});
 test("macOS 自动搜索记住的路径、系统和用户应用目录", async () => {
   const paths = await clientCandidates(
     "darwin",

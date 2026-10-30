@@ -14,6 +14,18 @@ export interface FeatureModule {
   prepare(files: Map<string, string>): PatchEdit[];
   verify(files: Map<string, string>): boolean;
 }
+export interface QuotaBinding {
+  target: string;
+  profile: string;
+  react: string;
+  jsx: string;
+  account: string;
+  read: string;
+  query: string;
+  scopeHook: string;
+  scope: string;
+  guards: string[];
+}
 export interface Adapter {
   id: string;
   platform: "darwin" | "win32";
@@ -22,4 +34,5 @@ export interface Adapter {
   status: "experimental" | "verified";
   files: Record<string, string>;
   nativeFiles?: Record<string, string>;
+  quota?: QuotaBinding;
 }

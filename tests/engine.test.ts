@@ -10,11 +10,12 @@ import {
   symlink,
   readlink,
 } from "node:fs/promises";
-import { join } from "node:path";
+import { join, normalize } from "node:path";
 import { Asar, sha256 } from "../src/engine/asar";
 import { treeHash } from "../src/engine/files";
-import { quotaTarget, quotaModule } from "../src/modules/quota";
+import { quotaTarget, quotaModule, quotaFor } from "../src/modules/quota";
 import { fixture, makeAsar } from "./helpers";
+import { adapters } from "../src/modules/adapters";
 import { extractFile } from "@electron/asar";
 test("ASAR 修改、完整性与未修改资源保持", async (t) => {
   const f = await fixture();
@@ -27,7 +28,7 @@ test("ASAR 修改、完整性与未修改资源保持", async (t) => {
   );
   const b = await Asar.load(dest);
   assert.equal(hash, b.headerHash);
-  assert.equal(extractFile(dest, quotaTarget).toString(), "changed");
+  assert.equal(extractFile(dest, normalize(quotaTarget)).toString(), "changed");
   assert.equal((await b.read(quotaTarget)).toString(), "changed");
   assert.equal((await b.read("untouched.txt")).toString(), "保留的原始资源");
   assert.equal(b.entry(quotaTarget).integrity?.hash, sha256("changed"));
@@ -220,4 +221,37 @@ test("旧预览版已安装的额度模块可直接升级并恢复原版", async
   assert.equal(script.includes("chatgpt-modder:quota@1"), false);
   await f.engine.restore(f.root);
   assert.equal(await treeHash(f.root), original);
+});
+
+test("引擎按适配器选择新版额度模块，拒绝缺少绑定证据的资源", async (t) => {
+  const f = await fixture();
+  t.after(() => rm(f.temp, { recursive: true, force: true }));
+  const binding = adapters.find(
+    (a) => a.id === "win-26.1027.30824-x64",
+  )!.quota!;
+  // Synthetic host functions only; official code is never committed as a test fixture.
+  const text =
+    "function hwn(e){return e}/* " +
+    binding.guards.filter((g) => g !== "function hwn(e){").join(" | ") +
+    " */";
+  await makeAsar(f.asar, { [binding.target]: text, "untouched.txt": "keep" });
+  const adapter = f.services.adapters[0];
+  adapter.quota = binding;
+  adapter.files = { [binding.target]: sha256(text) };
+  adapter.headerHash = (await Asar.load(f.asar)).headerHash;
+  const original = await treeHash(f.root);
+  await f.engine.apply(f.root, ["quota"]);
+  const archive = await Asar.load(f.asar);
+  const patched = (await archive.read(binding.target)).toString();
+  assert.match(patched, /function hwn\(props\)/);
+  assert.match(patched, /query=J\(Nb\)/);
+  assert.match(patched, /scope=rf\(Z\)/);
+  assert.equal((await archive.read("untouched.txt")).toString(), "keep");
+  await f.engine.restore(f.root);
+  assert.equal(await treeHash(f.root), original);
+  const invalid = text.replace("Vhn as Nb,", "Vhn as Changed,");
+  assert.throws(
+    () => quotaFor(binding).prepare(new Map([[binding.target, invalid]])),
+    /锚点/,
+  );
 });

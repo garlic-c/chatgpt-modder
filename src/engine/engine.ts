@@ -10,7 +10,7 @@ import {
   assertMutableInstallation,
 } from "./platform";
 import { adapters } from "../modules/adapters";
-import { quotaModule, resolveModules } from "../modules/quota";
+import { modulesForAdapter, resolveModules } from "../modules/quota";
 import type { Adapter } from "../modules/types";
 
 interface Manifest {
@@ -86,7 +86,15 @@ export class Engine {
     const info = await this.services.clientInfo(input),
       archive = await Asar.load(info.asar);
     const files: Record<string, string> = {};
-    for (const path of Object.keys(adapters[0].files)) {
+    const matching = this.services.adapters.filter(
+      (a) => a.platform === info.platform && a.version === info.version,
+    );
+    const resources = matching.length
+      ? matching
+      : this.services.adapters.filter((a) => a.platform === info.platform);
+    for (const path of new Set(
+      resources.flatMap((a) => Object.keys(a.files)),
+    )) {
       try {
         files[path] = sha256(await archive.read(path));
       } catch {
@@ -174,7 +182,9 @@ export class Engine {
       status: restriction ? "protected" : (adapter?.status ?? "unsupported"),
       modules: m?.modules ?? [],
       message:
-        restriction ||
+        (restriction && !adapter
+          ? `已定位商店客户端 ${info.version}，此版本尚未适配，修改已禁用；可导出兼容诊断。`
+          : restriction) ||
         (adapter
           ? "已匹配文件指纹；当前为实验适配，尚未通过登录与实机完整验收"
           : "此客户端版本或平台尚未适配，修改已禁用"),
@@ -241,6 +251,7 @@ export class Engine {
       const adapter = this.services.adapters.find(
         (a) => a.platform === info.platform && a.version === info.version,
       )!;
+      const selected = resolveModules(ids, modulesForAdapter(adapter));
       this.log("正在校验原版备份…");
       if (!oldManifest) {
         if (await exists(p.backup))
