@@ -2,11 +2,11 @@
 
 可扩展、无需后台常驻的 ChatGPT 桌面修改器。Electron + TypeScript，仅加载内置模块。
 
-当前版本 **0.1.0-preview.12**。macOS 与 Windows 已由用户确认验证可用，两端当前适配 ChatGPT **26.1027.30824**。
+当前版本 **0.1.0-preview.12**。两端当前适配 ChatGPT **26.1027.30824**。
 
 ## 首个模块
 
-头像上方显示 5H 剩余百分比、重置倒计时及周剩余细进度条。百分比不超过 10% 时变红，单位为小写，进度条为 1px。复用客户端账号额度状态；未知或失效数据使用占位，切换账号清除旧数据。组件自带异步与异常边界，不应阻塞整页初始化。
+头像上方显示 5H 剩余百分比、重置倒计时及周剩余细进度条。百分比不超过 10% 时变红。
 
 ## 截图
 
@@ -16,13 +16,9 @@
 
 ![ChatGPT 头像上方的额度显示，剩余 9% 时显示红色](docs/images/quota-low.png)
 
-额度模块实机示例：剩余 9% 时红色提醒、小写倒计时和细周进度条。截图不代表所有平台与启动流程均已验收。
-
 ## 下载
 
-[下载 0.1.0-preview.12](https://github.com/GarliC-C/chatgpt-modder/releases/tag/v0.1.0-preview.12)：macOS Apple Silicon 提供既定背景与拖拽布局的 DMG，Windows x64 提供便携 EXE，同时附 SHA256 校验文件。仓库及发行已公开，可直接下载。
-
-macOS DMG 沿用拖拽安装布局，窗口为 768×602，底部使用生成的毯面纹理扩展，较上一版再增加 10pt。安装包仅包含修改器。
+[下载 0.1.0-preview.12](https://github.com/GarliC-C/chatgpt-modder/releases/tag/v0.1.0-preview.12)
 
 ## 开发
 
