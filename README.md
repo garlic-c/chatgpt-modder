@@ -2,7 +2,7 @@
 
 可扩展、无需后台常驻的 ChatGPT 桌面修改器。Electron + TypeScript，仅加载内置模块。
 
-当前版本 **0.1.0-preview.11**。macOS 与 Windows 已由用户确认验证可用，两端当前适配 ChatGPT **26.1027.30824**。
+当前版本 **0.1.0-preview.12**。macOS 与 Windows 已由用户确认验证可用，两端当前适配 ChatGPT **26.1027.30824**。
 
 ## 首个模块
 
@@ -20,7 +20,7 @@
 
 ## 下载
 
-[下载 0.1.0-preview.11](https://github.com/GarliC-C/chatgpt-modder/releases/tag/v0.1.0-preview.11)：macOS Apple Silicon 提供既定背景与拖拽布局的 DMG，Windows x64 提供便携 EXE，同时附 SHA256 校验文件。仓库及发行已公开，可直接下载。
+[下载 0.1.0-preview.12](https://github.com/GarliC-C/chatgpt-modder/releases/tag/v0.1.0-preview.12)：macOS Apple Silicon 提供既定背景与拖拽布局的 DMG，Windows x64 提供便携 EXE，同时附 SHA256 校验文件。仓库及发行已公开，可直接下载。
 
 macOS DMG 沿用拖拽安装布局，窗口为 768×602，底部使用生成的毯面纹理扩展，较上一版再增加 10pt。安装包仅包含修改器。
 
@@ -53,7 +53,7 @@ powershell.exe -NoProfile -File .\scripts\diagnose-windows-discovery.ps1
 | macOS Apple Silicon | 26.1027.30824 | DMG |
 | Windows x64 | 26.1027.30824 | 便携 EXE |
 
-两平台已由用户确认可用。旧 26.1023.51421 适配记录保留；新版本仍需匹配对应平台的资源指纹。macOS 和 Windows 同版本的资源哈希不同，分别校验。未提供 macOS Intel 包。
+两平台已由用户确认可用。官方更新到已知受支持版本后，重新应用会建立独立备份并保留旧版记录；同版本异常变化仍拒绝修改。旧 26.1023.51421 适配记录保留；新版本仍需匹配对应平台的资源指纹。macOS 和 Windows 同版本的资源哈希不同，分别校验。未提供 macOS Intel 包。
 
 Windows 商店安装使用用户目录副本，请从 **ChatGPT（Modder）** 快捷方式启动。官方安装及原快捷方式保持不变；副本不随商店自动更新。详见 [Windows 使用说明](docs/WINDOWS-OPERATION-AND-RISKS.md)。
 

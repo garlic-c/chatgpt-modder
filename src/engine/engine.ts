@@ -1,5 +1,6 @@
 import { version as modderVersion } from "../../package.json";
 import { mkdir, cp, rename, rm, open, unlink, readFile } from "./native-fs";
+import { randomUUID } from "node:crypto";
 import { join, dirname, basename, resolve } from "node:path";
 import { Asar, sha256 } from "./asar";
 import { fileHash, treeHash, exists, atomicJson, readJson } from "./files";
@@ -50,6 +51,7 @@ export interface EngineServices {
 }
 export class Engine {
   readonly services: EngineServices;
+  private generations = new Map<string, string>();
   constructor(
     readonly storage: string,
     readonly log: (s: string) => void = () => {},
@@ -65,16 +67,55 @@ export class Engine {
     };
   }
   private paths(root: string) {
-    const dir = join(this.storage, sha256(resolve(root)));
+    const base = join(this.storage, sha256(resolve(root)));
+    const dir = this.generations.has(root)
+      ? join(base, "generations", this.generations.get(root)!)
+      : base;
     return {
+      base,
+      active: join(base, "active.json"),
       dir,
       backup: join(dir, "original.app"),
       manifest: join(dir, "manifest.json"),
       journal: join(dir, "transaction.json"),
-      lock: join(dir, "operation.lock"),
+      lock: join(base, "operation.lock"),
       stage: join(dirname(root), "." + basename(root) + ".cgm-stage.app"),
       old: join(dirname(root), "." + basename(root) + ".cgm-previous.app"),
     };
+  }
+  private async loadGeneration(root: string) {
+    const active = this.paths(root).active;
+    if (!(await exists(active))) {
+      this.generations.delete(root);
+      return;
+    }
+    const state = await readJson<{ schema: number; generation: string }>(
+      active,
+    );
+    if (state.schema !== 1 || !/^[a-f0-9]{64}$/.test(state.generation))
+      throw Error("备份代际记录无效，已停止");
+    this.generations.set(root, state.generation);
+  }
+  private async startGeneration(
+    root: string,
+    version: string,
+    previousVersion: string,
+  ) {
+    const p = this.paths(root),
+      generation = sha256(randomUUID());
+    const next = join(p.base, "generations", generation);
+    await mkdir(next, { recursive: true, mode: 0o700 });
+    await atomicJson(p.active, {
+      schema: 1,
+      generation,
+      version,
+      previousVersion,
+      previous: this.generations.get(root) ?? null,
+    });
+    this.generations.set(root, generation);
+    this.log(
+      `检测到客户端更新 ${previousVersion} → ${version}；旧版备份保留，为新版建立独立备份`,
+    );
   }
   private async manifest(root: string) {
     const p = this.paths(root);
@@ -128,6 +169,7 @@ export class Engine {
     // Recovery must also be available if a crash happened between the two renames.
     let root = resolve(input);
     if (await exists(root)) root = (await this.services.clientInfo(root)).root;
+    await this.loadGeneration(root);
     const p = this.paths(root),
       pending = await exists(p.journal);
     if (!(await exists(root)) && pending)
@@ -145,14 +187,16 @@ export class Engine {
       m = await this.manifest(root);
     if (info.declaredHeader && info.declaredHeader !== archive.headerHash)
       throw Error("客户端 ASAR 与声明的完整性哈希不一致");
-    if (m && m.installedTree) {
+    const upgraded = !!m && m.version !== info.version;
+    const current = upgraded ? null : m;
+    if (current?.installedTree) {
       if ((await fileHash(info.asar)) !== (await this.installedAsar(root)))
         return {
           root,
           version: info.version,
           compatible: false,
           status: "changed",
-          modules: m.modules,
+          modules: current.modules,
           message: "客户端已升级或被其他程序修改，禁止套用旧补丁或恢复旧版",
           pending,
         };
@@ -162,10 +206,10 @@ export class Engine {
         a.platform === info.platform &&
         a.version === info.version &&
         (a.headerHash === archive.headerHash ||
-          (a.headerHash === null && info.platform === "win32") ||
-          (m?.adapterId === a.id && !!m.installedTree)),
+          (a.headerHash === null && info.platform === "win32" && !upgraded) ||
+          (current?.adapterId === a.id && !!current.installedTree)),
     );
-    if (adapter && !m?.installedTree) {
+    if (adapter && !current?.installedTree) {
       await this.checkFiles(archive, adapter);
       await this.checkNative(root, adapter);
     }
@@ -181,13 +225,15 @@ export class Engine {
       compatible: !!adapter && !restriction,
       patchCompatible: !!adapter,
       status: restriction ? "protected" : (adapter?.status ?? "unsupported"),
-      modules: m?.modules ?? [],
+      modules: current?.modules ?? [],
       message:
         (restriction && !adapter
           ? `已定位商店客户端 ${info.version}，此版本尚未适配，修改已禁用；可导出兼容诊断。`
           : restriction) ||
         (adapter
-          ? "已匹配客户端版本和文件指纹"
+          ? upgraded
+            ? "检测到受支持的客户端更新；重新应用时为新版建立独立备份，保留旧版记录"
+            : "已匹配客户端版本和文件指纹"
           : "此客户端版本或平台尚未适配，修改已禁用"),
       pending,
     };
@@ -211,7 +257,7 @@ export class Engine {
   }
   private async withLock<T>(root: string, fn: () => Promise<T>) {
     const p = this.paths(root);
-    await mkdir(p.dir, { recursive: true, mode: 0o700 });
+    await mkdir(p.base, { recursive: true, mode: 0o700 });
     let lock;
     try {
       lock = await open(p.lock, "wx", 0o600);
@@ -222,6 +268,7 @@ export class Engine {
     }
     try {
       await lock.writeFile(String(process.pid));
+      await this.loadGeneration(root);
       return await fn();
     } finally {
       await lock.close();
@@ -234,7 +281,7 @@ export class Engine {
     const info = await this.services.clientInfo(input),
       root = info.root;
     return this.withLock(root, async () => {
-      const p = this.paths(root);
+      let p = this.paths(root);
       if (await exists(p.journal)) throw Error("先恢复中断操作");
       await assertMutableInstallation(root);
       const inspection = await this.inspect(root);
@@ -242,16 +289,29 @@ export class Engine {
       await this.services.assertStopped(root);
       const currentTree = await treeHash(root);
       let oldManifest = await this.manifest(root);
-      if (
-        oldManifest &&
-        currentTree !== (oldManifest.installedTree ?? oldManifest.originalTree)
-      )
-        throw Error("客户端发生变化，拒绝覆盖或旧版恢复");
       if ((await exists(p.stage)) || (await exists(p.old)))
         throw Error("暂存目录已存在，请先检查并恢复中断操作");
       const adapter = this.services.adapters.find(
         (a) => a.platform === info.platform && a.version === info.version,
       )!;
+      if (oldManifest && oldManifest.version !== info.version) {
+        // A new generation is allowed only for an exact pristine known build.
+        // The old directory, backup and manifest remain untouched throughout.
+        const pristine = await Asar.load(info.asar);
+        if (!adapter.headerHash || adapter.headerHash !== pristine.headerHash)
+          throw Error("新版客户端尚无完整原版指纹，已停止");
+        await this.checkFiles(pristine, adapter);
+        await this.checkNative(root, adapter);
+        if ((await treeHash(root)) !== currentTree)
+          throw Error("检查期间客户端发生变化，已停止");
+        await this.startGeneration(root, info.version, oldManifest.version);
+        p = this.paths(root);
+        oldManifest = null;
+      } else if (
+        oldManifest &&
+        currentTree !== (oldManifest.installedTree ?? oldManifest.originalTree)
+      )
+        throw Error("客户端发生变化，拒绝覆盖或旧版恢复");
       const selected = resolveModules(ids, modulesForAdapter(adapter));
       this.log("正在校验原版备份…");
       if (!oldManifest) {
@@ -374,6 +434,8 @@ export class Engine {
       await this.services.assertStopped(root);
       const m = await this.manifest(root);
       if (!m?.installedTree) throw Error("该客户端没有已安装的功能");
+      if (m.version !== info.version)
+        throw Error("客户端版本已变化，禁止恢复旧版");
       if ((await treeHash(root)) !== m.installedTree)
         throw Error("客户端已升级或发生变化，禁止恢复旧版");
       if ((await treeHash(p.backup)) !== m.originalTree)
@@ -417,9 +479,10 @@ export class Engine {
     });
   }
   async recover(input: string) {
-    const root = resolve(input),
-      p = this.paths(root);
-    await mkdir(p.dir, { recursive: true });
+    const root = resolve(input);
+    await this.loadGeneration(root);
+    const p = this.paths(root);
+    await mkdir(p.base, { recursive: true });
     if (await exists(p.lock)) {
       const pid = Number(await readFile(p.lock, "utf8"));
       if (!Number.isInteger(pid) || pid <= 0)
