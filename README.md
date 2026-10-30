@@ -4,15 +4,13 @@
 
 当前版本 **0.1.0-preview.12**。两端当前适配 ChatGPT **26.1027.30824**。
 
-## 首个模块
+## 功能
 
 头像上方显示 5H 剩余百分比、重置倒计时及周剩余细进度条。百分比不超过 10% 时变红。
 
 ## 截图
 
 ![ChatGPT Modder 的 macOS 深色界面](docs/images/modder-macos.png)
-
-修改器界面示例，由用户提供，截图版本为 macOS preview.7；当前发行版本见下方下载页。
 
 ![ChatGPT 头像上方的额度显示，剩余 9% 时显示红色](docs/images/quota-low.png)
 
