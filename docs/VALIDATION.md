@@ -15,6 +15,8 @@
 
 未验证：登录状态下额度组件的实际显示（本环境无登录会话，不编造登录数据）；修改器图形界面在真实桌面上的完整点击流程（Linux 副本流程与 Windows 共用同一引擎与副本模式，引擎已在真实目录上验证）。因此 Linux 适配标记为 `experimental`，待用户在登录环境确认显示后按惯例转 `verified`。
 
+2026-10-31 用户决定：因 ChatGPT 的 Linux 客户端界面布局与 macOS/Windows 不同、显示效果未经确认，Release 暂不提供 Linux 发行包，Linux 适配只保留在源码中供自行改造编译；发行流水线维持 macOS/Windows 两平台。
+
 ## preview.11 本轮检查
 
 - 本机 Mac 官方安装版本为 26.1027.30824，ASAR 声明一致；primary、initial、shared 和两个关键原生文件分别记录 SHA256。

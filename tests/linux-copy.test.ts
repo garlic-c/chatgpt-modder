@@ -15,7 +15,13 @@ import { tmpdir } from "node:os";
 import { LinuxCopy } from "../src/engine/linux-copy";
 import { treeHash } from "../src/engine/files";
 
-test("Linux 副本保持官方文件不变，保留权限位，支持重复准备与版本隔离", async () => {
+test(
+  "Linux 副本保持官方文件不变，保留权限位，支持重复准备与版本隔离",
+  // LinuxCopy 只在 Linux 上运行：权限位断言（0o555/0o444/可执行位）
+  // 在 Windows 上没有 POSIX 语义，沿用仓库里 macOS/Windows 拷贝测试的
+  // 平台跳过写法，而不是放宽断言。
+  { skip: process.platform !== "linux" },
+  async () => {
   const temp = await mkdtemp(join(tmpdir(), "cgm-linux-copy-"));
   try {
     const source = join(temp, "official"),
@@ -74,7 +80,10 @@ test("Linux 副本保持官方文件不变，保留权限位，支持重复准�
   }
 });
 
-test("Linux 副本不复制符号链接", async () => {
+test(
+  "Linux 副本不复制符号链接",
+  { skip: process.platform !== "linux" },
+  async () => {
   const temp = await mkdtemp(join(tmpdir(), "cgm-linux-links-"));
   try {
     const source = join(temp, "official");

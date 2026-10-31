@@ -2,7 +2,7 @@
 
 可扩展、无需后台常驻的 ChatGPT 桌面修改器。Electron + TypeScript，仅加载内置模块。
 
-当前版本 **0.1.0-preview.13**。三端当前适配 ChatGPT **26.1027.30824**（Linux 为实验状态）。
+当前已发布版本 **0.1.0-preview.12**。macOS 与 Windows 适配 ChatGPT **26.1027.30824**；源码另含 Linux 实验适配，但暂不提供 Linux 发行包（原因见下方兼容版本说明）。
 
 ## 功能
 
@@ -16,7 +16,7 @@
 
 ## 下载
 
-[下载 0.1.0-preview.13](https://github.com/GarliC-C/chatgpt-modder/releases/tag/v0.1.0-preview.13)
+[下载 0.1.0-preview.12](https://github.com/GarliC-C/chatgpt-modder/releases/tag/v0.1.0-preview.12)
 
 ## 开发
 
@@ -30,7 +30,7 @@ npm run build
 npm start
 ```
 
-macOS、Windows 与 Linux 可分别执行 `npm run pack:mac`、`npm run pack:win`、`npm run pack:linux`。macOS 还可执行 `npm run pack:dmg`，重绘背景时需要本机 Swift/AppKit；这些命令不适用于 Windows。Windows 打包使用内置 ICO 与 PE 资源编辑脚本，不依赖 Icon Composer 或 Wine。
+macOS、Windows 与 Linux 可分别执行 `npm run pack:mac`、`npm run pack:win`、`npm run pack:linux`。macOS 还可执行 `npm run pack:dmg`，重绘背景时需要本机 Swift/AppKit；这些命令不适用于 Windows。Windows 打包使用内置 ICO 与 PE 资源编辑脚本，不依赖 Icon Composer 或 Wine。注意：Release 只发布 macOS 与 Windows 包，`pack:linux` 仅供自行编译 Linux 版使用。
 
 Windows 调试的首个步骤是只读采集安装元信息：
 
@@ -46,13 +46,13 @@ powershell.exe -NoProfile -File .\scripts\diagnose-windows-discovery.ps1
 | --- | --- | --- |
 | macOS Apple Silicon | 26.1027.30824 | DMG |
 | Windows x64 | 26.1027.30824 | 便携 EXE |
-| Linux x64（实验） | 26.1027.30824 | AppImage |
+| Linux x64（实验，仅源码） | 26.1027.30824 | 不提供，自行编译 |
 
-macOS 与 Windows 已由用户确认可用；Linux 已在 Ubuntu 24.04 上用真实客户端副本验证引擎全流程，登录状态下的额度显示待确认。官方更新到已知受支持版本后，重新应用会建立独立备份并保留旧版记录；同版本异常变化仍拒绝修改。旧 26.1023.51421 适配记录保留；新版本仍需匹配对应平台的资源指纹。三个平台同版本的资源哈希不同，分别校验。未提供 macOS Intel 包。
+macOS 与 Windows 已由用户确认可用。Linux 源码适配已在 Ubuntu 24.04 上用真实客户端副本验证引擎全流程，但 ChatGPT 的 Linux 客户端界面布局与 macOS/Windows 不同，额度组件在登录后的实际显示效果未经真机确认，因此暂不提供 Linux 发行包。官方更新到已知受支持版本后，重新应用会建立独立备份并保留旧版记录；同版本异常变化仍拒绝修改。旧 26.1023.51421 适配记录保留；新版本仍需匹配对应平台的资源指纹。三个平台同版本的资源哈希不同，分别校验。未提供 macOS Intel 包。
 
 Windows 商店安装使用用户目录副本，请从 **ChatGPT（Modder）** 快捷方式启动。官方安装及原快捷方式保持不变；副本不随商店自动更新。详见 [Windows 使用说明](docs/WINDOWS-OPERATION-AND-RISKS.md)。
 
-Linux 系统安装（`.deb`）同样使用用户目录副本，请从应用菜单的 **ChatGPT（Modder）** 启动项启动。官方安装及原启动项保持不变；副本不随 `.deb` 自动更新。详见 [Linux 使用说明](docs/LINUX-OPERATION-AND-RISKS.md)。
+需要 Linux 版的用户请自行改造编译：克隆本仓库后执行 `npm run pack:linux` 生成 AppImage。因 ChatGPT 的 Linux 客户端界面布局与 macOS/Windows 不同，注入位置与显示效果可能需要按实际界面自行调整。自行编译的版本在系统安装（`.deb`）上同样使用用户目录副本，应用后请从应用菜单的 **ChatGPT（Modder）** 启动项启动；官方安装及原启动项保持不变，副本不随 `.deb` 自动更新。详见 [Linux 使用说明](docs/LINUX-OPERATION-AND-RISKS.md)。
 
 ## 目录
 
