@@ -7,12 +7,14 @@ import {
   readdir,
   rename,
   mkdir,
+  mkdtemp,
   symlink,
   readlink,
   lchmod,
   lstat,
 } from "node:fs/promises";
 import { join, normalize } from "node:path";
+import { tmpdir } from "node:os";
 import { Asar, sha256 } from "../src/engine/asar";
 import { treeHash } from "../src/engine/files";
 import { quotaTarget, quotaModule, quotaFor } from "../src/modules/quota";
@@ -253,6 +255,66 @@ test("引擎按适配器选择新版额度模块，拒绝缺少绑定证据的�
   await f.engine.restore(f.root);
   assert.equal(await treeHash(f.root), original);
   const invalid = text.replace("Vhn as Nb,", "Vhn as Changed,");
+  assert.throws(
+    () => quotaFor(binding).prepare(new Map([[binding.target, invalid]])),
+    /锚点/,
+  );
+});
+
+test("Linux 适配器按官方绑定应用、验证与恢复", async (t) => {
+  const temp = await mkdtemp(join(tmpdir(), "cgm-linux-engine-"));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const root = join(temp, "chatgpt"),
+    asar = join(root, "resources/app.asar");
+  await mkdir(join(root, "resources"), { recursive: true });
+  await writeFile(join(root, "ChatGPT"), "synthetic executable");
+  const linux = adapters.find((a) => a.id === "linux-26.1027.30824-x64")!;
+  const binding = linux.quota!;
+  // Synthetic host functions only; official code is never committed as a test fixture.
+  const text =
+    "function YEn(e){return e}/* " +
+    binding.guards.filter((g) => g !== "function YEn(e){").join(" | ") +
+    " */";
+  await makeAsar(asar, { [binding.target]: text, "untouched.txt": "keep" });
+  const archive = await Asar.load(asar);
+  const engine = new Engine(join(temp, "storage"), () => {}, {
+    clientInfo: async (path) => ({
+      root: path,
+      version: linux.version,
+      asar: join(path, "resources/app.asar"),
+      plist: null,
+      platform: "linux",
+      declaredHeader: null,
+    }),
+    assertStopped: async () => {},
+    updateIntegrity: async () => {},
+    signAndVerify: async () => {},
+    adapters: [
+      {
+        ...linux,
+        headerHash: archive.headerHash,
+        files: { [binding.target]: sha256(text) },
+        nativeFiles: undefined,
+      },
+    ],
+  });
+  const original = await treeHash(root);
+  assert.equal((await engine.inspect(root)).compatible, true);
+  await engine.apply(root, ["quota"]);
+  const patched = (
+    await (await Asar.load(asar)).read(binding.target)
+  ).toString();
+  assert.match(patched, /function YEn\(props\)/);
+  assert.match(patched, /query=Z\(qh\)/);
+  assert.match(patched, /scope=df\(J\)/);
+  assert.match(patched, /\$En\.Suspense/);
+  assert.equal(
+    (await (await Asar.load(asar)).read("untouched.txt")).toString(),
+    "keep",
+  );
+  await engine.restore(root);
+  assert.equal(await treeHash(root), original);
+  const invalid = text.replace("Ihn as qh,", "Ihn as Changed,");
   assert.throws(
     () => quotaFor(binding).prepare(new Map([[binding.target, invalid]])),
     /锚点/,

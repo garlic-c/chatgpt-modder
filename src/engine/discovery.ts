@@ -76,6 +76,7 @@ export async function clientCandidates(
       "/Applications/ChatGPT.app",
       posix.join(home, "Applications/ChatGPT.app"),
     );
+  if (platform === "linux") paths.push("/usr/lib/chatgpt");
   if (platform === "win32") {
     for (const base of [
       env.LOCALAPPDATA && win32.join(env.LOCALAPPDATA, "Programs"),

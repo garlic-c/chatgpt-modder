@@ -55,6 +55,15 @@ test("结构化商店发现结果保留路径兼容性", () => {
     [path],
   );
 });
+test("Linux 自动搜索记住的路径与系统安装目录", async () => {
+  assert.deepEqual(await clientCandidates("linux", undefined, {}, "/test-user"), [
+    "/usr/lib/chatgpt",
+  ]);
+  assert.deepEqual(
+    await clientCandidates("linux", "/custom/chatgpt", {}, "/test-user"),
+    ["/custom/chatgpt", "/usr/lib/chatgpt"],
+  );
+});
 test("macOS 自动搜索记住的路径、系统和用户应用目录", async () => {
   const paths = await clientCandidates(
     "darwin",

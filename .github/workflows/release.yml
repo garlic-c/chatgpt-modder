@@ -88,8 +88,28 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  linux:
+    needs: validate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run pack:linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-linux
+          path: release/*.AppImage
+          if-no-files-found: error
+          retention-days: 7
+
   publish:
-    needs: [validate, macos, windows]
+    needs: [validate, macos, windows, linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -109,11 +129,11 @@ jobs:
           import fs from 'node:fs';
           import crypto from 'node:crypto';
           const r=JSON.parse(fs.readFileSync('.github/release-plan.json'));
-          const originals=[`ChatGPT Modder-${r.version}-mac-arm64.dmg`,`ChatGPT Modder-${r.version}-win-x64.exe`];
+          const originals=[`ChatGPT Modder-${r.version}-mac-arm64.dmg`,`ChatGPT Modder-${r.version}-win-x64.exe`,`ChatGPT Modder-${r.version}-linux-x86_64.AppImage`];
           if(JSON.stringify(fs.readdirSync('release-assets').sort())!==JSON.stringify([...originals].sort()))throw Error('Missing or unexpected platform assets');
           const names=originals.map(name=>{const normalized=name.replaceAll(' ','.');fs.renameSync(`release-assets/${name}`,`release-assets/${normalized}`);return normalized;});
           const hashes=Object.fromEntries(names.map(n=>[n,crypto.createHash('sha256').update(fs.readFileSync(`release-assets/${n}`)).digest('hex')]));
-          fs.writeFileSync('release-assets/BUILD-INFO.json',JSON.stringify({version:r.version,tag:r.tag,commit:process.env.GITHUB_SHA,workflowRun:process.env.GITHUB_RUN_ID,prerelease:true,assets:hashes,macos:'arm64 DMG using preset background and layout',windows:'x64 portable; user-confirmed functional'},null,2)+'\n');
+          fs.writeFileSync('release-assets/BUILD-INFO.json',JSON.stringify({version:r.version,tag:r.tag,commit:process.env.GITHUB_SHA,workflowRun:process.env.GITHUB_RUN_ID,prerelease:true,assets:hashes,macos:'arm64 DMG using preset background and layout',windows:'x64 portable; user-confirmed functional',linux:'x64 AppImage; experimental, engine verified on Ubuntu 24.04 with the official .deb client'},null,2)+'\n');
           names.push('BUILD-INFO.json');
           fs.writeFileSync('release-assets/SHA256SUMS.txt',names.sort().map(n=>crypto.createHash('sha256').update(fs.readFileSync(`release-assets/${n}`)).digest('hex')+'  '+n+'\n').join(''));
           JS
@@ -136,7 +156,7 @@ jobs:
             const old=(await github.rest.repos.listReleaseAssets({owner,repo,release_id:release.id,per_page:100})).data;
             for(const asset of old)await github.rest.repos.deleteReleaseAsset({owner,repo,asset_id:asset.id});
             const files=fs.readdirSync('release-assets').sort();
-            if(files.length!==4)throw Error('Incomplete release asset set');
+            if(files.length!==5)throw Error('Incomplete release asset set');
             for(const name of files){
               const data=fs.readFileSync(path.join('release-assets',name));
               const uploaded=(await github.rest.repos.uploadReleaseAsset({owner,repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}})).data;

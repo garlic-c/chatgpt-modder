@@ -2,14 +2,20 @@ import { Engine } from "./engine/engine";
 import { join } from "node:path";
 import { homedir } from "node:os";
 const command = process.argv[2],
-  path = process.argv[3] ?? "/Applications/ChatGPT.app";
+  path =
+    process.argv[3] ??
+    (process.platform === "linux"
+      ? "/usr/lib/chatgpt"
+      : "/Applications/ChatGPT.app");
 const engine = new Engine(
   process.env.CGM_STORAGE ??
     join(
       homedir(),
       process.platform === "darwin"
         ? "Library/Application Support/ChatGPT Modder/backups"
-        : "AppData/Roaming/ChatGPT Modder/backups",
+        : process.platform === "linux"
+          ? ".local/share/ChatGPT Modder/backups"
+          : "AppData/Roaming/ChatGPT Modder/backups",
     ),
   console.error,
 );

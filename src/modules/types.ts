@@ -28,7 +28,7 @@ export interface QuotaBinding {
 }
 export interface Adapter {
   id: string;
-  platform: "darwin" | "win32";
+  platform: "darwin" | "win32" | "linux";
   version: string;
   headerHash: string | null;
   status: "experimental" | "verified";

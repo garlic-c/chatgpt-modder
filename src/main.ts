@@ -9,7 +9,7 @@ import {
 } from "electron";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { writeFile, readFile } from "node:fs/promises";
+import { writeFile, readFile, mkdir, chmod } from "node:fs/promises";
 import { Engine } from "./engine/engine";
 import { builtInModules } from "./modules/quota";
 import {
@@ -19,8 +19,13 @@ import {
   type DiscoveryReport,
 } from "./engine/discovery";
 import { icnsPng } from "./engine/icons";
-import { windowsExecutable, assertStopped } from "./engine/platform";
+import {
+  windowsExecutable,
+  linuxExecutable,
+  assertStopped,
+} from "./engine/platform";
 import { WindowsCopy } from "./engine/windows-copy";
+import { LinuxCopy } from "./engine/linux-copy";
 let win: BrowserWindow | null = null,
   busy = false;
 const uiPath = join(__dirname, "ui/index.html");
@@ -55,6 +60,9 @@ else {
       (message) => win?.webContents.send("operation-log", message),
     );
     const copies = new WindowsCopy(join(app.getPath("userData"), "clients"));
+    const linuxCopies = new LinuxCopy(
+      join(app.getPath("userData"), "clients"),
+    );
     const log = (message: string) =>
       win?.webContents.send("operation-log", message);
     const preferenceFile = join(app.getPath("userData"), "client.json");
@@ -90,6 +98,35 @@ else {
           message:
             "本地副本：请从桌面 ChatGPT（Modder）启动，官方快捷方式保持原样。",
         };
+      if (
+        process.platform === "linux" &&
+        state.status === "protected" &&
+        state.patchCompatible
+      ) {
+        const existing = await linuxCopies.existing(path);
+        if (existing) {
+          path = existing;
+          state = await engine.inspect(existing);
+        } else
+          state = {
+            ...state,
+            compatible: true,
+            status: "store-copy",
+            message:
+              "系统安装版：应用时创建本地副本，请从新启动项启动；可能需要重新登录。",
+          };
+      }
+      if (
+        process.platform === "linux" &&
+        path.startsWith(linuxCopies.storage) &&
+        state.compatible
+      )
+        state = {
+          ...state,
+          status: "user-copy",
+          message:
+            "本地副本：请从应用菜单的 ChatGPT（Modder）启动，官方安装保持原样。",
+        };
       let icon: string | undefined;
       if (process.platform === "darwin") {
         try {
@@ -103,13 +140,25 @@ else {
           }
         } catch {}
       }
+      if (!icon && process.platform === "linux") {
+        try {
+          const png = await readFile(
+            join(path, "resources/icon-chatgpt.png"),
+          );
+          const image = nativeImage.createFromBuffer(png);
+          if (!image.isEmpty())
+            icon = image.resize({ width: 36, height: 36 }).toDataURL();
+        } catch {}
+      }
       if (!icon)
         try {
           icon = (
             await app.getFileIcon(
               process.platform === "win32"
                 ? await windowsExecutable(path)
-                : path,
+                : process.platform === "linux"
+                  ? await linuxExecutable(path)
+                  : path,
               { size: "small" },
             )
           ).toDataURL();
@@ -126,7 +175,10 @@ else {
         preferred = saved.path;
       } catch {}
       const managed =
-        process.platform === "win32" && preferred?.startsWith(copies.storage);
+        (process.platform === "win32" &&
+          preferred?.startsWith(copies.storage)) ||
+        (process.platform === "linux" &&
+          preferred?.startsWith(linuxCopies.storage));
       discovery = { candidates: [] };
       const candidates = await clientCandidates(
         process.platform,
@@ -244,6 +296,22 @@ else {
                 log,
               );
             }
+            if (process.platform === "linux" && source.status === "protected") {
+              if (!source.patchCompatible)
+                throw Error(
+                  "此系统安装版客户端的版本或文件指纹尚未适配，请导出兼容诊断",
+                );
+              if (!ids.length) return await inspectClient(path);
+              await assertStopped(source.root);
+              path = await linuxCopies.prepare(
+                source.root,
+                async (root) => {
+                  const state = await engine.inspect(root);
+                  if (!state.compatible) throw Error(state.message);
+                },
+                log,
+              );
+            }
             const result = await engine.apply(path, ids);
             if (
               process.platform === "win32" &&
@@ -278,6 +346,48 @@ else {
                 ok
                   ? "请从桌面 ChatGPT（Modder）启动；原快捷方式仍打开官方版"
                   : `快捷方式未创建；请从 ${executable} 启动`,
+              );
+              await writeFile(
+                preferenceFile,
+                JSON.stringify({ path: result.root }),
+              ).catch(() => {});
+            }
+            if (
+              process.platform === "linux" &&
+              path.startsWith(linuxCopies.storage)
+            ) {
+              const executable = await linuxExecutable(path);
+              const applications = join(
+                app.getPath("home"),
+                ".local/share/applications",
+              );
+              const entry = join(applications, "chatgpt-modder.desktop");
+              let ok = false;
+              try {
+                await mkdir(applications, { recursive: true });
+                await writeFile(
+                  entry,
+                  [
+                    "[Desktop Entry]",
+                    "Name=ChatGPT（Modder）",
+                    "Comment=ChatGPT Modder 本地副本；官方系统安装保持不变",
+                    `Exec="${executable}" %U`,
+                    `Icon=${join(path, "resources/icon-chatgpt.png")}`,
+                    "Type=Application",
+                    "StartupNotify=true",
+                    "Categories=Utility;Development;",
+                    "MimeType=x-scheme-handler/codex;",
+                    "",
+                  ].join("\n"),
+                  "utf8",
+                );
+                await chmod(entry, 0o755);
+                ok = true;
+              } catch {}
+              log(
+                ok
+                  ? "请从应用菜单的 ChatGPT（Modder）启动；官方安装与原启动项仍打开官方版"
+                  : `启动项未创建；请从 ${executable} 启动`,
               );
               await writeFile(
                 preferenceFile,

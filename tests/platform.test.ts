@@ -1,9 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { NtExecutable, NtExecutableResource } from "resedit";
 import { peHeaderHash, rewritePeHeaderHash } from "../src/engine/windows-pe";
-import { localEntitlements } from "../src/engine/platform";
+import {
+  localEntitlements,
+  verifyAsarIntegrity,
+} from "../src/engine/platform";
 import { rewriteMacDigest } from "../src/engine/mac-digest";
+import { Asar } from "../src/engine/asar";
+import { makeAsar } from "./helpers";
 import { createHash } from "node:crypto";
 test("Mac 框架摘要同步更新，完整性校验保持启用", () => {
   const sentinel = Buffer.from("AGbevlPCksUGKNL8TSn7wGmJEuJsXb2A");
@@ -96,6 +104,61 @@ test("Windows 实机格式：大写 SHA256、双反斜杠路径可读写且保�
     {},
   ])
     assert.throws(() => rewritePeHeaderHash(fixture(invalid), "b".repeat(64)));
+});
+test("Linux ASAR 完整性条目与文件内容自洽校验", async (t) => {
+  const temp = await mkdtemp(join(tmpdir(), "cgm-linux-asar-"));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const path = join(temp, "app.asar");
+  await makeAsar(path, { "a.txt": "hello", "dir/b.txt": "world" });
+  await verifyAsarIntegrity(await Asar.load(path));
+  const bytes = await readFile(path);
+  bytes[bytes.length - 1] ^= 1;
+  await writeFile(path, bytes);
+  await assert.rejects(
+    async () => verifyAsarIntegrity(await Asar.load(path)),
+    /完整性校验不一致/,
+  );
+});
+test("Linux ASAR 校验覆盖解包到 app.asar.unpacked 的条目", async (t) => {
+  const temp = await mkdtemp(join(tmpdir(), "cgm-linux-asar-unpacked-"));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const path = join(temp, "app.asar");
+  const packed = Buffer.from("packed"),
+    unpacked = Buffer.from("unpacked-bytes");
+  const integrity = (b: Buffer) => ({
+    algorithm: "SHA256",
+    hash: createHash("sha256").update(b).digest("hex"),
+    blockSize: 4194304,
+    blocks: [createHash("sha256").update(b).digest("hex")],
+  });
+  const header = {
+    files: {
+      "a.txt": { size: packed.length, offset: "0", integrity: integrity(packed) },
+      "native.node": {
+        size: unpacked.length,
+        unpacked: true,
+        integrity: integrity(unpacked),
+      },
+    },
+  };
+  const json = Buffer.from(JSON.stringify(header)),
+    padded = (4 + json.length + 3) & ~3,
+    prefix = Buffer.alloc(12 + padded);
+  prefix.writeUInt32LE(4, 0);
+  prefix.writeUInt32LE(4 + padded, 4);
+  prefix.writeUInt32LE(padded, 8);
+  prefix.writeUInt32LE(json.length, 12);
+  json.copy(prefix, 16);
+  await writeFile(path, Buffer.concat([prefix, packed]));
+  const { mkdir } = await import("node:fs/promises");
+  await mkdir(path + ".unpacked", { recursive: true });
+  await writeFile(join(path + ".unpacked", "native.node"), unpacked);
+  await verifyAsarIntegrity(await Asar.load(path));
+  await writeFile(join(path + ".unpacked", "native.node"), "tampered");
+  await assert.rejects(
+    async () => verifyAsarIntegrity(await Asar.load(path)),
+    /完整性校验不一致/,
+  );
 });
 test("Mac 本地签名剔除团队专属授权，保留必要 JIT 授权", () => {
   const result = localEntitlements({

@@ -101,3 +101,54 @@ adapters.push({
     target: "webview/assets/app-primary-95a0e6d83f1e.js",
   },
 });
+
+// Linux 26.1027.30824: every fingerprint and alias below was read from the
+// official .deb resources, never inferred from the macOS/Windows builds.
+// The data path differs from Windows: the usage state lives in a store query
+// node (qh, imported from the initial chunk) whose data is the usage
+// response; components subscribe through the generic atom hook (Z) and the
+// store from df(J) invalidates the node. The sidebar footer profile
+// component is YEn, in a module whose React namespace is $En (Sf()) and
+// whose JSX namespace is lG (q()).
+adapters.push({
+  id: "linux-26.1027.30824-x64",
+  platform: "linux",
+  version: "26.1027.30824",
+  headerHash:
+    "641cd0b02ef1127e9733e4f4e77facc66e8e6e321a8afe5ddddf26a86836b816",
+  status: "experimental",
+  files: {
+    "webview/assets/app-primary-7029a31b5fe1.js":
+      "a411fb8c853a41a9dfd4ab6b6ca19d08099abf3454e03ac2461aae69ab7b2028",
+    "webview/assets/app-initial-c4cac3105190.js":
+      "5092c2aa079ed1435df53e4b2b758776e0ba405b3dae56207ab6a65c3e08374f",
+    "webview/assets/app-shared-7a3b5b1a0788.js":
+      "bdfe90b6091c0ae04f83bb37946782f9c4ed9dd3b2baabb988017e2a57ba8d40",
+  },
+  nativeFiles: {
+    ChatGPT:
+      "b9ff66b1ceea3cecd6211d9de5de80424bbacf5c3f080c056fe8a1f7d5fac69e",
+  },
+  quota: {
+    target: "webview/assets/app-primary-7029a31b5fe1.js",
+    profile: "YEn",
+    react: "$En",
+    jsx: "lG",
+    account: "cv",
+    read: "Z",
+    query: "qh",
+    scopeHook: "df",
+    scope: "J",
+    guards: [
+      "function YEn(e){",
+      "$En=Sf()",
+      "lG=q()",
+      "PFn as cv,",
+      "oTt as Z,",
+      "Ihn as qh,",
+      "rTt as df,",
+      "lU=Re(J,",
+      "let{data:n}=t(qh)",
+    ],
+  },
+});

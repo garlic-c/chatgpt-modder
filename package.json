@@ -1,6 +1,6 @@
 {
   "name": "chatgpt-modder",
-  "version": "0.1.0-preview.12",
+  "version": "0.1.0-preview.13",
   "private": true,
   "description": "可扩展、无需后台常驻的 ChatGPT 桌面修改器（预览版）",
   "author": "ChatGPT Modder contributors",
@@ -14,6 +14,7 @@
     "inspect": "node --import tsx src/cli.ts inspect",
     "pack:mac": "npm run build && electron-builder --mac dmg zip --arm64 --publish never",
     "pack:win": "node scripts/build-windows-icon.mjs && npm run build && electron-builder --win portable --x64 --publish never",
+    "pack:linux": "npm run build && electron-builder --linux AppImage --x64 --publish never",
     "format": "prettier --write src tests scripts",
     "pack:dmg": "swift scripts/build-dmg-background.swift build/dmg/background-source.png build/dmg && npm run build && electron-builder --mac dmg --arm64 --publish never"
   },
@@ -53,6 +54,14 @@
       ],
       "signAndEditExecutable": false,
       "icon": "build/icons/Tibo.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility",
+      "icon": "build/icons/Tibo.iconset/icon_512x512.png",
+      "maintainer": "ChatGPT Modder contributors"
     },
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "afterPack": "scripts/after-pack.cjs",
