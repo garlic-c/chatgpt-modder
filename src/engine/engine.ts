@@ -43,6 +43,7 @@ export type Inspection = {
   message: string;
   pending: boolean;
   patchCompatible?: boolean;
+  adapterId?: string;
 };
 export interface EngineServices {
   clientInfo: typeof clientInfo;
@@ -211,14 +212,13 @@ export class Engine {
           pending,
         };
     }
-    const adapter = this.services.adapters.find(
-      (a) =>
-        a.platform === info.platform &&
-        a.version === info.version &&
-        (a.headerHash === archive.headerHash ||
-          (a.headerHash === null && info.platform === "win32" && !upgraded) ||
-          (current?.adapterId === a.id && !!current.installedTree)),
-    );
+    const candidates = this.services.adapters.filter(a => a.platform === info.platform);
+    let adapter = current?.installedTree
+      ? candidates.find(a => a.id === current.adapterId)
+      : await this.originalAdapter(archive, candidates);
+    // The old Windows profile shipped without a reference archive fingerprint.
+    if (!adapter && !upgraded && !current?.installedTree && info.platform === "win32")
+      adapter = candidates.find(a => a.headerHash === null && a.version === info.version);
     if (adapter && !current?.installedTree) {
       await this.checkFiles(archive, adapter);
       await this.checkNative(root, adapter);
@@ -234,19 +234,29 @@ export class Engine {
       version: info.version,
       compatible: !!adapter && !restriction,
       patchCompatible: !!adapter,
+      adapterId: adapter?.id,
       status: restriction ? "protected" : (adapter?.status ?? "unsupported"),
       modules: current?.modules ?? [],
       message:
         (restriction && !adapter
-          ? `已定位商店客户端 ${info.version}，此版本尚未适配，修改已禁用；可导出兼容诊断。`
+          ? `已定位商店客户端 ${info.version}，当前界面资源尚未适配，修改已禁用；可导出兼容诊断。`
           : restriction) ||
         (adapter
           ? upgraded
             ? "检测到受支持的客户端更新；重新应用时为新版建立独立备份，保留旧版记录"
-            : "已匹配客户端版本和文件指纹"
-          : "此客户端版本或平台尚未适配，修改已禁用"),
+            : "已匹配模块所需的客户端资源"
+          : "当前客户端资源尚未适配，修改已禁用"),
       pending,
     };
+  }
+  private async originalAdapter(archive: Asar, candidates: Adapter[]) {
+    const exact = candidates.find(a => a.headerHash === archive.headerHash);
+    if (exact) return exact;
+    for (const adapter of candidates) {
+      if (adapter.headerHash && await archive.headerAtPackageVersion(adapter.version) === adapter.headerHash)
+        return adapter;
+    }
+    return undefined;
   }
   private async installedAsar(root: string) {
     const p = this.paths(root);
@@ -302,13 +312,14 @@ export class Engine {
       if ((await exists(p.stage)) || (await exists(p.old)))
         throw Error("暂存目录已存在，请先检查并恢复中断操作");
       const adapter = this.services.adapters.find(
-        (a) => a.platform === info.platform && a.version === info.version,
-      )!;
+        (a) => a.id === inspection.adapterId,
+      );
+      if (!adapter) throw Error("未找到已验证的适配规则");
       if (oldManifest && oldManifest.version !== info.version) {
         // A new generation is allowed only for an exact pristine known build.
         // The old directory, backup and manifest remain untouched throughout.
         const pristine = await Asar.load(info.asar);
-        if (!adapter.headerHash || adapter.headerHash !== pristine.headerHash)
+        if (!await this.originalAdapter(pristine, [adapter]))
           throw Error("新版客户端尚无完整原版指纹，已停止");
         await this.checkFiles(pristine, adapter);
         await this.checkNative(root, adapter);

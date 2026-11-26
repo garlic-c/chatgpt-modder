@@ -350,7 +350,7 @@ else {
             if (process.platform === "win32" && source.status === "protected") {
               if (!source.patchCompatible)
                 throw Error(
-                  "此商店版客户端的版本或文件指纹尚未适配，请导出兼容诊断",
+                  "此商店版客户端的资源指纹尚未适配，请导出兼容诊断",
                 );
               if (!ids.length) return await inspectClient(path);
               await assertStopped(source.root);
@@ -366,7 +366,7 @@ else {
             if (process.platform === "linux" && source.status === "protected") {
               if (!source.patchCompatible)
                 throw Error(
-                  "此系统安装版客户端的版本或文件指纹尚未适配，请导出兼容诊断",
+                  "此系统安装版客户端的资源指纹尚未适配，请导出兼容诊断",
                 );
               if (!ids.length) return await inspectClient(path);
               await assertStopped(source.root);

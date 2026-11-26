@@ -84,6 +84,50 @@ export class Asar {
       await f.close();
     }
   }
+  // Compare with a known release while excluding only its package version.
+  // This calculation is read-only. Preserve every other header field.
+  async headerAtPackageVersion(version: string): Promise<string | null> {
+    const entry = this.header.files?.["package.json"];
+    if (!entry?.integrity || entry.integrity.algorithm !== "SHA256" ||
+        !entry.size || entry.size > 1024 * 1024 || entry.offset == null ||
+        entry.unpacked || entry.link) return null;
+    const bytes = await this.read("package.json");
+    if (sha256(bytes) !== entry.integrity.hash) return null;
+    const text = bytes.toString("utf8");
+    const pkg = JSON.parse(text);
+    if (typeof pkg.version !== "string" || pkg.version === version) return null;
+    const field = /("version"\s*:\s*)"(?:[^"\\]|\\.)*"/g;
+    for (const match of text.matchAll(field)) {
+      const start = match.index!;
+      const revised = text.slice(0, start) + match[1] + JSON.stringify(version) +
+        text.slice(start + match[0].length);
+      if (JSON.parse(revised).version !== version) continue;
+      const value = Buffer.from(revised);
+      const { blockSize } = entry.integrity;
+      if (!Number.isSafeInteger(blockSize) || blockSize <= 0) return null;
+      if (entry.integrity.blocks.length !== Math.ceil(bytes.length / blockSize)) return null;
+      for (let i = 0; i < bytes.length; i += blockSize)
+        if (entry.integrity.blocks[i / blockSize] !== sha256(bytes.subarray(i, i + blockSize))) return null;
+      const blocks: string[] = [];
+      for (let i = 0; i < value.length; i += blockSize)
+        blocks.push(sha256(value.subarray(i, i + blockSize)));
+      const header = structuredClone(this.header);
+      const next = header.files!["package.json"];
+      next.size = value.length;
+      next.integrity!.hash = sha256(value);
+      next.integrity!.blocks = blocks;
+      const delta = value.length - bytes.length;
+      const end = Number(entry.offset) + bytes.length;
+      function shift(node: Entry) {
+        if (node.files) Object.values(node.files).forEach(shift);
+        else if (node.offset != null && Number(node.offset) >= end)
+          node.offset = String(Number(node.offset) + delta);
+      }
+      if (delta) shift(header);
+      return sha256(JSON.stringify(header));
+    }
+    return null;
+  }
   async rewrite(destination: string, changes: Map<string, Buffer>) {
     const header: Entry = structuredClone(this.header);
     const entries: { path: string; old: Entry; next: Entry }[] = [];

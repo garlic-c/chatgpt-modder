@@ -472,3 +472,31 @@ test("版本变化时即使目录字节一致也不能恢复旧版", async (t) =
   await assert.rejects(() => f.engine.restore(f.root), /版本已变化/);
   assert.equal(await treeHash(f.root), before);
 });
+
+test("仅包版本字段变化时自动匹配、独立备份、重复启用并恢复新版", async t => {
+  const f = await fixture();
+  t.after(() => rm(f.temp, { recursive: true, force: true }));
+  const text = (await (await Asar.load(f.asar)).read(quotaTarget)).toString();
+  const write = (v: string, extra = "unchanged") => makeAsar(f.asar, {
+    "package.json": JSON.stringify({ dependency: {version: "1"}, version: v }),
+    [quotaTarget]: text, "other": extra,
+  });
+  const adapter = f.engine.services.adapters[0];
+  await write(adapter.version);
+  adapter.headerHash = (await Asar.load(f.asar)).headerHash;
+  await f.engine.apply(f.root, ["quota"]);
+  await f.engine.restore(f.root);
+  const info = f.services.clientInfo;
+  f.engine.services.clientInfo = async root => ({ ...await info(root), version: "next-longer" });
+  await write("next-longer", "different");
+  assert.equal((await f.engine.inspect(f.root)).compatible, false);
+  await write("next-longer");
+  const before = await treeHash(f.root);
+  assert.equal((await f.engine.inspect(f.root)).adapterId, adapter.id);
+  await f.engine.apply(f.root, ["quota"]);
+  const reopened = new Engine(f.storage, undefined, f.engine.services);
+  assert.deepEqual((await reopened.inspect(f.root)).modules, ["quota"]);
+  await reopened.apply(f.root, ["quota"]);
+  await reopened.restore(f.root);
+  assert.equal(await treeHash(f.root), before);
+});
