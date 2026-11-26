@@ -1,9 +1,11 @@
+import { backupBase } from "./windows-storage";
 import { version as modderVersion } from "../../package.json";
-import { mkdir, cp, rename, rm, open, unlink, readFile } from "./native-fs";
+import { mkdir, cp, rename, rm, open, unlink, readFile, realpath } from "./native-fs";
+import type { WindowsCopy } from "./windows-copy";
 import { randomUUID } from "node:crypto";
-import { join, dirname, basename, resolve } from "node:path";
+import { join, dirname, basename, relative, resolve } from "node:path";
 import { Asar, sha256 } from "./asar";
-import { fileHash, treeHash, exists, atomicJson, readJson } from "./files";
+import { fileHash, treeHash, treeFingerprint, exists, atomicJson, readJson } from "./files";
 import {
   clientInfo,
   assertStopped,
@@ -56,6 +58,7 @@ export class Engine {
     readonly storage: string,
     readonly log: (s: string) => void = () => {},
     services: Partial<EngineServices> = {},
+    private readonly legacyStorage?: string,
   ) {
     this.services = {
       clientInfo,
@@ -67,7 +70,7 @@ export class Engine {
     };
   }
   private paths(root: string) {
-    const base = join(this.storage, sha256(resolve(root)));
+    const base = backupBase(this.storage, root, this.legacyStorage);
     const dir = this.generations.has(root)
       ? join(base, "generations", this.generations.get(root)!)
       : base;
@@ -113,9 +116,7 @@ export class Engine {
       previous: this.generations.get(root) ?? null,
     });
     this.generations.set(root, generation);
-    this.log(
-      `检测到客户端更新 ${previousVersion} → ${version}；旧版备份保留，为新版建立独立备份`,
-    );
+
   }
   private async manifest(root: string) {
     const p = this.paths(root);
@@ -148,6 +149,15 @@ export class Engine {
         archive.entry("webview/assets").files ?? {},
       ).filter((n) => /^app-(primary|initial)-.*\.js$/.test(n))) {
         const path = "webview/assets/" + name;
+        files[path] = sha256(await archive.read(path));
+      }
+    } catch {}
+    // New builds use numbered entry chunks. Hash only local entry scripts
+    // referenced by the packaged page, without relying on their build names.
+    try {
+      const html = (await archive.read("webview/index.html")).toString("utf8");
+      const scripts = html.matchAll(/(?:src|href)=["'](?:\.\/|\/)?(assets\/[a-zA-Z0-9_.-]+\.js)["']/g);
+      for (const path of new Set(Array.from(scripts, m => "webview/" + m[1]))) {
         files[path] = sha256(await archive.read(path));
       }
     } catch {}
@@ -305,6 +315,7 @@ export class Engine {
         if ((await treeHash(root)) !== currentTree)
           throw Error("检查期间客户端发生变化，已停止");
         await this.startGeneration(root, info.version, oldManifest.version);
+        this.log(`检测到客户端更新 ${oldManifest.version} → ${info.version}；旧版备份保留，为新版建立独立备份`);
         p = this.paths(root);
         oldManifest = null;
       } else if (
@@ -476,6 +487,48 @@ export class Engine {
       }
       this.log("已恢复原版及原始签名。");
       return await this.inspect(root);
+    });
+  }
+  async offerRestoredCopyCleanup(
+    store: WindowsCopy,
+    root: string,
+    confirm: (preview: { copy: string; backup: string; bytes: number }) => Promise<boolean>,
+    recycle: (path: string) => Promise<void>,
+  ) {
+    if (!store.owns(root)) throw Error("只可清理修改器管理的商店副本");
+    return this.withLock(root, async () => {
+      const p = this.paths(root);
+      const check = async () => {
+        for (const path of [root, p.backup]) {
+          if (relative(path, await realpath(path)) !== "")
+            throw Error("清理路径已重定向");
+        }
+        const sourceHash = await store.recordedSourceHash(root);
+        const m = await this.manifest(root);
+        if (!m || m.originalAsar !== sourceHash || m.installedTree !== null || m.modules.length ||
+            await exists(p.journal) || await exists(p.stage) || await exists(p.old))
+          throw Error("副本未完成恢复");
+        await this.services.assertStopped(root);
+        const copy = await treeFingerprint(root);
+        const backup = await treeFingerprint(p.backup);
+        if (copy.hash !== m.originalTree || backup.hash !== m.originalTree)
+          throw Error("副本或备份已发生变化");
+        return { version: m.version, bytes: copy.bytes + backup.bytes };
+      };
+      const preview = await check();
+      if (!await confirm({ copy: root, backup: p.backup, bytes: preview.bytes })) return false;
+      await check();
+      await this.services.assertStopped(root);
+      // Retain the stable lock and older generations. If interrupted between
+      // recycle operations, a future install still creates its own backup.
+      await recycle(root);
+      try {
+        await this.startGeneration(root, preview.version, preview.version);
+        await recycle(p.backup);
+      } catch (error) {
+        throw Error(`副本已移入回收站，备份仍在 ${p.backup}。${(error as Error).message}`);
+      }
+      return true;
     });
   }
   async recover(input: string) {

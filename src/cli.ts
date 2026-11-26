@@ -1,3 +1,4 @@
+import { windowsLocalData } from "./engine/windows-storage";
 import { Engine } from "./engine/engine";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -7,17 +8,18 @@ const command = process.argv[2],
     (process.platform === "linux"
       ? "/usr/lib/chatgpt"
       : "/Applications/ChatGPT.app");
+const profile = process.platform === "darwin"
+  ? join(homedir(), "Library/Application Support/ChatGPT Modder")
+  : process.platform === "linux"
+    ? join(homedir(), ".local/share/ChatGPT Modder")
+    : windowsLocalData(homedir());
 const engine = new Engine(
-  process.env.CGM_STORAGE ??
-    join(
-      homedir(),
-      process.platform === "darwin"
-        ? "Library/Application Support/ChatGPT Modder/backups"
-        : process.platform === "linux"
-          ? ".local/share/ChatGPT Modder/backups"
-          : "AppData/Roaming/ChatGPT Modder/backups",
-    ),
+  process.env.CGM_STORAGE ?? join(profile, "backups"),
   console.error,
+  {},
+  !process.env.CGM_STORAGE && process.platform === "win32"
+    ? join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), "ChatGPT Modder", "backups")
+    : undefined,
 );
 (async () => {
   if (command === "inspect")

@@ -24,6 +24,7 @@ import {
   linuxExecutable,
   assertStopped,
 } from "./engine/platform";
+import { windowsLocalData } from "./engine/windows-storage";
 import { WindowsCopy } from "./engine/windows-copy";
 import { LinuxCopy } from "./engine/linux-copy";
 let win: BrowserWindow | null = null,
@@ -55,11 +56,19 @@ else {
     win?.focus();
   });
   app.whenReady().then(() => {
+    const profile = app.getPath("userData");
+    const windows = process.platform === "win32";
+    const data = windows ? windowsLocalData(app.getPath("home")) : profile;
     const engine = new Engine(
-      join(app.getPath("userData"), "backups"),
+      join(data, "backups"),
       (message) => win?.webContents.send("operation-log", message),
+      {},
+      windows ? join(profile, "backups") : undefined,
     );
-    const copies = new WindowsCopy(join(app.getPath("userData"), "clients"));
+    const copies = new WindowsCopy(join(data, "clients"));
+    const legacyCopies = new WindowsCopy(join(profile, "clients"));
+    const copyStores = data === profile ? [copies] : [copies, legacyCopies];
+    const owner = (path: string) => copyStores.find(store => store.owns(path));
     const linuxCopies = new LinuxCopy(
       join(app.getPath("userData"), "clients"),
     );
@@ -74,22 +83,24 @@ else {
         state.status === "protected" &&
         state.patchCompatible
       ) {
-        const existing = await copies.existing(path);
-        if (existing) {
-          path = existing;
-          state = await engine.inspect(existing);
-        } else
-          state = {
-            ...state,
-            compatible: true,
-            status: "store-copy",
-            message:
-              "商店版：应用时创建本地副本，请从新快捷方式启动；可能需要重新登录。",
-          };
+        state = {
+          ...state, compatible: true, status: "store-copy",
+          message: "已定位官方商店客户端。应用修改后请从桌面 ChatGPT（Modder）启动。",
+        };
+        for (const store of copyStores) {
+          const existing = await store.existing(path);
+          if (!existing) continue;
+          const copy = await engine.inspect(existing);
+          if (copy.modules.length || copy.pending || !copy.compatible) {
+            state = copy;
+            path = existing;
+            break;
+          }
+        }
       }
       if (
         process.platform === "win32" &&
-        path.startsWith(copies.storage) &&
+        owner(path) &&
         state.compatible
       )
         state = {
@@ -176,7 +187,7 @@ else {
       } catch {}
       const managed =
         (process.platform === "win32" &&
-          preferred?.startsWith(copies.storage)) ||
+          preferred && owner(preferred)) ||
         (process.platform === "linux" &&
           preferred?.startsWith(linuxCopies.storage));
       discovery = { candidates: [] };
@@ -188,12 +199,23 @@ else {
         discovery,
       );
       const found = await discoverClient(candidates, inspectClient, discovery);
+      if (windows && preferred && owner(preferred) && !found?.inspection?.compatible) {
+        // An official update can replace the Store install while the user's
+        // previously patched standalone copy still needs to be restored.
+        const previous = await engine.inspect(preferred).catch(() => null);
+        if (previous && (previous.pending || (previous.compatible && previous.modules.length))) {
+          log("已定位先前的本地副本，可恢复该副本。");
+          return { path: preferred, inspection: previous };
+        }
+      }
       if (found) return found;
       if (discovery.query?.error)
         log(`安装包查询失败：${discovery.query.error}`);
-      return managed && preferred && !discovery.query?.error
-        ? discoverClient([preferred], inspectClient, discovery)
-        : null;
+      if (!managed || !preferred || discovery.query?.error) return null;
+      const fallback = await discoverClient([preferred], inspectClient, discovery);
+      if (windows && fallback?.inspection && !fallback.inspection.modules.length && !fallback.inspection.pending)
+        return null;
+      return fallback;
     });
     ipcMain.handle("version", (event) => {
       trusted(event);
@@ -278,6 +300,51 @@ else {
           throw Error("无效的模块选择");
         busy = true;
         try {
+          if (windows && (method === "restore" || (method === "apply" && !ids.length))) {
+            const store = owner(path);
+            if (store) {
+              const restored = await engine.restore(path);
+              let original = await store.originalFor(path).catch(() => null);
+              if (!original) {
+                // The Store may have replaced the package since this copy was created.
+                const report: DiscoveryReport = { candidates: [] };
+                await clientCandidates("win32", undefined, process.env, app.getPath("home"), report);
+                for (const candidate of report.candidates.filter(item => item.source === "store")) {
+                  const state = await engine.inspect(candidate.path).catch(() => null);
+                  if (state?.status === "protected") {
+                    original = state.root;
+                    break;
+                  }
+                }
+              }
+              if (original) {
+                await writeFile(preferenceFile, JSON.stringify({ path: original }));
+                try {
+                  const cleaned = await engine.offerRestoredCopyCleanup(
+                    store, restored.root,
+                    async ({ copy, backup, bytes }) => {
+                      const size = (bytes / 1024 ** 2).toLocaleString("zh-CN", { maximumFractionDigits: 1 });
+                      const answer = await dialog.showMessageBox(win!, {
+                        type: "question",
+                        buttons: ["保留文件", "移入回收站"],
+                        defaultId: 0, cancelId: 0,
+                        message: "恢复已完成，要清理本次副本和备份吗？",
+                        detail: `副本：${copy}\n备份：${backup}\n\n文件大小合计约 ${size} MiB。清空回收站后可释放空间。今后请从开始菜单启动 ChatGPT。`,
+                      });
+                      return answer.response === 1;
+                    },
+                    target => shell.trashItem(target),
+                  );
+                  log(cleaned ? "本次副本和备份已移入回收站。请从开始菜单启动 ChatGPT。" : "已保留文件。请从开始菜单启动 ChatGPT。");
+                } catch (error) {
+                  log(`已恢复，清理未完成：${(error as Error).message}`);
+                }
+                return await inspectClient(original);
+              }
+              log("副本已恢复。未定位到官方安装，已保留副本和备份。");
+              return restored;
+            }
+          }
           if (method === "apply") {
             const source = await engine.inspect(path);
             if (process.platform === "win32" && source.status === "protected") {
@@ -315,7 +382,7 @@ else {
             const result = await engine.apply(path, ids);
             if (
               process.platform === "win32" &&
-              path.startsWith(copies.storage)
+              owner(path)
             ) {
               const executable = await windowsExecutable(path);
               const shortcut = join(

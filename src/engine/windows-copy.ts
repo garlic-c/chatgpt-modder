@@ -1,5 +1,5 @@
 import { cp, mkdir, rename, rm, lstat, readdir, chmod } from "./native-fs";
-import { join, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { atomicJson, exists, fileHash, readJson, treeHash } from "./files";
 import { sha256 } from "./asar";
 
@@ -7,6 +7,25 @@ import { sha256 } from "./asar";
 // fingerprint gets its own independent, transactional user-local copy.
 export class WindowsCopy {
   constructor(readonly storage: string) {}
+  owns(root: string) {
+    const parts = relative(this.storage, resolve(root)).split(sep);
+    return parts.length === 2 && /^[a-f0-9]{64}$/.test(parts[0]) && parts[1] === "client";
+  }
+  async recordedSourceHash(root: string) {
+    if (!this.owns(root)) throw Error("未知的副本位置");
+    const record = await readJson<{ schema: number; original: string; sourceHash: string }>(
+      join(dirname(root), "origin.json"),
+    );
+    if (record.schema !== 1 || !/^[0-9a-f]{64}$/.test(record.sourceHash) ||
+        relative(join(this.storage, sha256(record.original + "\0" + record.sourceHash), "client"), root) !== "")
+      throw Error("副本来源记录不匹配");
+    return record.sourceHash;
+  }
+  async originalFor(root: string) {
+    if (!this.owns(root)) return null;
+    const record = await readJson<{original: string}>(join(dirname(root), "origin.json"));
+    return (await this.existing(record.original)) === resolve(root) ? record.original : null;
+  }
   private async paths(source: string) {
     const original = resolve(source);
     const sourceHash = await fileHash(join(original, "resources/app.asar"));

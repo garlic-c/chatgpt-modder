@@ -23,14 +23,14 @@ export const storeDiscoveryScript = `
 $ErrorActionPreference = 'Stop'
 $paths = @()
 $manifestErrors = @()
-Get-AppxPackage | Where-Object { $_.Name -match '^OpenAI[.].*(ChatGPT|Codex|Desktop)' } | Sort-Object Version -Descending | ForEach-Object {
+Get-AppxPackage | Where-Object { $_.Name -match '^OpenAI[.].*(ChatGPT|Codex|Desktop)' -and $_.Name -notmatch '^OpenAI[.]CodexPrimaryRuntime([.]|$)' } | Sort-Object Version -Descending | ForEach-Object {
   $pkg = $_
   $root = $pkg.InstallLocation
   if ($root) {
     try {
       $manifest = Get-AppxPackageManifest -Package $pkg.PackageFullName
       foreach ($entry in $manifest.Package.Applications.Application) {
-        if ($entry.Executable) {
+        if ($entry.Executable -and ([IO.Path]::GetFileName([string]$entry.Executable) -in @('ChatGPT.exe', 'Codex.exe'))) {
           $exe = [IO.Path]::GetFullPath([IO.Path]::Combine($root, [string]$entry.Executable))
           if ($exe.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
             $paths += [IO.Path]::GetDirectoryName($exe)
@@ -172,7 +172,7 @@ export async function discoverClient<T extends { compatible: boolean }>(
       if (record)
         record.stage = inspection.compatible ? "compatible" : "unsupported";
       if (inspection.compatible) return { path, inspection };
-      fallback ??= { path, inspection };
+      if (!fallback?.inspection) fallback = { path, inspection };
     } catch (error) {
       if (record) {
         record.stage = "inspect";

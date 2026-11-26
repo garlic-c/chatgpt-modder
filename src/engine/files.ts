@@ -24,7 +24,8 @@ export async function fileHash(path: string) {
   for await (const part of createReadStream(path)) h.update(part);
   return h.digest("hex");
 }
-export async function treeHash(root: string) {
+export async function treeFingerprint(root: string) {
+  let bytes = 0;
   const h = createHash("sha256");
   async function visit(path: string, relative: string) {
     const s = await lstat(path);
@@ -35,11 +36,15 @@ export async function treeHash(root: string) {
       for (const name of (await readdir(path)).sort())
         await visit(join(path, name), relative + "/" + name);
     } else if (s.isFile()) {
+      bytes += s.size;
       h.update("F" + s.size + ":" + (await fileHash(path)));
     } else throw Error("应用包含不支持的特殊文件");
   }
   await visit(root, "");
-  return h.digest("hex");
+  return { hash: h.digest("hex"), bytes };
+}
+export async function treeHash(root: string) {
+  return (await treeFingerprint(root)).hash;
 }
 export async function atomicJson(path: string, value: unknown) {
   const tmp = path + ".tmp";

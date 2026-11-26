@@ -2,7 +2,7 @@
 
 可扩展、无需后台常驻的 ChatGPT 桌面修改器。Electron + TypeScript，仅加载内置模块。
 
-当前已发布版本 **0.1.0-preview.12**。macOS 与 Windows 适配 ChatGPT **26.1027.30824**；源码另含 Linux 实验适配，但暂不提供 Linux 发行包（原因见下方兼容版本说明）。
+首个正式版 **0.1.0**。macOS 与 Windows 适配 ChatGPT **26.1027.30824**；源码另含 Linux 实验适配，但暂不提供 Linux 发行包（原因见下方兼容版本说明）。
 
 ## 功能
 
@@ -16,7 +16,7 @@
 
 ## 下载
 
-[下载 0.1.0-preview.12](https://github.com/GarliC-C/chatgpt-modder/releases/tag/v0.1.0-preview.12)
+[下载 0.1.0](https://github.com/GarliC-C/chatgpt-modder/releases/tag/v0.1.0)
 
 ## 开发
 
@@ -47,6 +47,8 @@ powershell.exe -NoProfile -File .\scripts\diagnose-windows-discovery.ps1
 | macOS Apple Silicon | 26.1027.30824 | DMG |
 | Windows x64 | 26.1027.30824 | 便携 EXE |
 | Linux x64（实验，仅源码） | 26.1027.30824 | 不提供，自行编译 |
+
+ChatGPT **26.1120.50957** 可定位和导出兼容诊断，额度模块尚未适配。Windows 上显示的 **26.1120.6357.0** 是对应的商店包版本。
 
 macOS 与 Windows 已由用户确认可用。Linux 源码适配已在 Ubuntu 24.04 上用真实客户端副本验证引擎全流程，但 ChatGPT 的 Linux 客户端界面布局与 macOS/Windows 不同，额度组件在登录后的实际显示效果未经真机确认，因此暂不提供 Linux 发行包。官方更新到已知受支持版本后，重新应用会建立独立备份并保留旧版记录；同版本异常变化仍拒绝修改。旧 26.1023.51421 适配记录保留；新版本仍需匹配对应平台的资源指纹。三个平台同版本的资源哈希不同，分别校验。未提供 macOS Intel 包。
 

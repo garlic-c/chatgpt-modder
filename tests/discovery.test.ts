@@ -122,3 +122,18 @@ test("客户端图标读取 PNG 图块，拒绝越界和空图块", () => {
   assert.equal(icnsPng(b), null);
   assert.equal(icnsPng(Buffer.from("bad")), null);
 });
+
+test("商店包根目录检查失败后，仍返回已读到版本的应用子目录", async () => {
+  const candidates = [process.cwd(), join(process.cwd(), "src")];
+  const report: DiscoveryReport = {
+    candidates: candidates.map(path => ({ path, source: "store" })),
+  };
+  const result = await discoverClient(candidates, async path => {
+    if (path === candidates[0]) throw Error("缺少应用资源");
+    return { version: "26.1120.50957", compatible: false };
+  }, report);
+  assert.equal(result?.path, candidates[1]);
+  assert.equal(result?.inspection?.version, "26.1120.50957");
+  assert.equal(result?.inspection?.compatible, false);
+  assert.equal(report.candidates[0].error, "缺少应用资源");
+});

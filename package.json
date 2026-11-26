@@ -1,8 +1,8 @@
 {
   "name": "chatgpt-modder",
-  "version": "0.1.0-preview.13",
+  "version": "0.1.0",
   "private": true,
-  "description": "可扩展、无需后台常驻的 ChatGPT 桌面修改器（预览版）",
+  "description": "可扩展、无需后台常驻的 ChatGPT 桌面修改器",
   "author": "ChatGPT Modder contributors",
   "license": "MIT",
   "main": "dist/main.cjs",

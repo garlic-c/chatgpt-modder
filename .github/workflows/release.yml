@@ -32,7 +32,7 @@ jobs:
           import fs from 'node:fs';
           const p=JSON.parse(fs.readFileSync('package.json'));
           const r=JSON.parse(fs.readFileSync('.github/release-plan.json'));
-          if(r.version!==p.version||r.tag!==`v${p.version}`||r.prerelease!==true)throw Error('Invalid preview release plan');
+          if(r.version!==p.version||r.tag!==`v${p.version}`||r.prerelease!==p.version.includes('-'))throw Error('Release version, tag and channel must match');
           if(!fs.existsSync(r.notes))throw Error('Missing release notes');
           fs.appendFileSync(process.env.GITHUB_OUTPUT,`version=${p.version}\n`);
           JS
@@ -113,11 +113,11 @@ jobs:
           if(JSON.stringify(fs.readdirSync('release-assets').sort())!==JSON.stringify([...originals].sort()))throw Error('Missing or unexpected platform assets');
           const names=originals.map(name=>{const normalized=name.replaceAll(' ','.');fs.renameSync(`release-assets/${name}`,`release-assets/${normalized}`);return normalized;});
           const hashes=Object.fromEntries(names.map(n=>[n,crypto.createHash('sha256').update(fs.readFileSync(`release-assets/${n}`)).digest('hex')]));
-          fs.writeFileSync('release-assets/BUILD-INFO.json',JSON.stringify({version:r.version,tag:r.tag,commit:process.env.GITHUB_SHA,workflowRun:process.env.GITHUB_RUN_ID,prerelease:true,assets:hashes,macos:'arm64 DMG using preset background and layout',windows:'x64 portable; user-confirmed functional'},null,2)+'\n');
+          fs.writeFileSync('release-assets/BUILD-INFO.json',JSON.stringify({version:r.version,tag:r.tag,commit:process.env.GITHUB_SHA,workflowRun:process.env.GITHUB_RUN_ID,prerelease:r.prerelease,assets:hashes,macos:'arm64 DMG using preset background and layout',windows:'x64 portable EXE'},null,2)+'\n');
           names.push('BUILD-INFO.json');
           fs.writeFileSync('release-assets/SHA256SUMS.txt',names.sort().map(n=>crypto.createHash('sha256').update(fs.readFileSync(`release-assets/${n}`)).digest('hex')+'  '+n+'\n').join(''));
           JS
-      - name: Publish complete preview release
+      - name: Publish complete release
         uses: actions/github-script@v7
         with:
           script: |
@@ -131,16 +131,22 @@ jobs:
               if(!release.draft||release.target_commitish!==context.sha)throw Error('Refusing to overwrite an existing published or unrelated release');
             } catch(error) {
               if(error.status!==404)throw error;
-              release=(await github.rest.repos.createRelease({owner,repo,tag_name:plan.tag,target_commitish:context.sha,name:plan.name,body:fs.readFileSync(plan.notes,'utf8').replace(/\]\((\.\.?\/[^)]+)\)/g,(_,target)=>'](https://github.com/'+owner+'/'+repo+'/blob/'+context.sha+'/'+path.posix.normalize(path.posix.join(path.posix.dirname(plan.notes),target))+')'),draft:true,prerelease:true})).data;
+              release=(await github.rest.repos.createRelease({owner,repo,tag_name:plan.tag,target_commitish:context.sha,name:plan.name,body:fs.readFileSync(plan.notes,'utf8').replace(/\]\((\.\.?\/[^)]+)\)/g,(_,target)=>'](https://github.com/'+owner+'/'+repo+'/blob/'+context.sha+'/'+path.posix.normalize(path.posix.join(path.posix.dirname(plan.notes),target))+')'),draft:true,prerelease:plan.prerelease})).data;
             }
             const old=(await github.rest.repos.listReleaseAssets({owner,repo,release_id:release.id,per_page:100})).data;
-            for(const asset of old)await github.rest.repos.deleteReleaseAsset({owner,repo,asset_id:asset.id});
             const files=fs.readdirSync('release-assets').sort();
             if(files.length!==4)throw Error('Incomplete release asset set');
+            if(old.some(asset=>!files.includes(asset.name)))throw Error('Unexpected existing draft assets');
             for(const name of files){
               const data=fs.readFileSync(path.join('release-assets',name));
+              const existing=old.find(asset=>asset.name===name);
+              if(existing){
+                const expected='sha256:'+require('node:crypto').createHash('sha256').update(data).digest('hex');
+                if(existing.state!=='uploaded'||existing.size!==data.length||existing.digest!==expected)throw Error('Draft asset differs: '+name);
+                continue;
+              }
               const uploaded=(await github.rest.repos.uploadReleaseAsset({owner,repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}})).data;
               if(uploaded.size!==data.length)throw Error('Asset size mismatch: '+name);
             }
-            await github.rest.repos.updateRelease({owner,repo,release_id:release.id,draft:false,prerelease:true,make_latest:'false'});
+            await github.rest.repos.updateRelease({owner,repo,release_id:release.id,draft:false,prerelease:plan.prerelease,make_latest:plan.prerelease?'false':'true'});
             core.notice('Published '+release.html_url);
